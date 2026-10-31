@@ -1,10 +1,16 @@
 //! The game server: reads its configuration, opens the database, and serves the game.
 
+mod clock;
 mod configuration;
 mod logging;
+mod price_source;
+
+use std::time::Duration;
 
 use anyhow::Context as _;
 use clap::Parser as _;
+use game::{Broadcast, Clock, Fanout, Game};
+use prices::PriceSource;
 use tokio::net::TcpListener;
 
 use crate::configuration::Configuration;
@@ -20,13 +26,47 @@ async fn main() -> anyhow::Result<()> {
 
     // The test controls exist only in a build with the Cargo feature `test-controls`.
     #[cfg(feature = "test-controls")]
-    let test_controls = Some(test_controls::routes());
+    let result = {
+        let clock = test_controls::ControllableClock::new();
+        let (source, controls) = test_controls::controllable_source();
+        let game = Game::new(clock.clone(), Broadcast::new());
+        let test_controls = test_controls::routes(test_controls::Controls {
+            clock,
+            source: controls,
+            game: game.clone(),
+        });
+        serve(configuration, game, source, Some(test_controls)).await
+    };
     #[cfg(not(feature = "test-controls"))]
-    let test_controls = None;
+    let result = serve(
+        configuration,
+        Game::new(clock::SystemClock, Broadcast::new()),
+        price_source::Unconnected,
+        None,
+    )
+    .await;
 
+    database.close().await;
+    result?;
+    tracing::info!("stopped");
+    Ok(())
+}
+
+async fn serve<C: Clock, F: Fanout>(
+    configuration: Configuration,
+    game: Game<C, F>,
+    source: impl PriceSource,
+    test_controls: Option<axum::Router>,
+) -> anyhow::Result<()> {
+    let running = tokio::spawn({
+        let game = game.clone();
+        async move { game.run(source).await }
+    });
     let router = web::router(web::Config {
+        game: game.clone(),
         build: configuration.build,
         app_dir: configuration.app_dir,
+        keepalive: Duration::from_secs(configuration.sse_keepalive_secs),
         test_controls,
     });
     let listener = TcpListener::bind(("0.0.0.0", configuration.port))
@@ -34,13 +74,16 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| format!("binding port {}", configuration.port))?;
     tracing::info!("listening on {}", listener.local_addr()?);
 
-    axum::serve(listener, router)
-        .with_graceful_shutdown(shutdown_signal())
+    let served = axum::serve(listener, router)
+        .with_graceful_shutdown(async move {
+            shutdown_signal().await;
+            // Graceful shutdown waits for every open stream, so the streams end first.
+            game.end_streams();
+        })
         .await
-        .context("serving")?;
-    database.close().await;
-    tracing::info!("stopped");
-    Ok(())
+        .context("serving");
+    running.abort();
+    served
 }
 
 async fn shutdown_signal() {

@@ -12,6 +12,9 @@ test-controls = ["dep:test-controls"]
 anyhow.workspace = true
 axum.workspace = true
 clap.workspace = true
+game.workspace = true
+jiff.workspace = true
+prices.workspace = true
 sqlite.workspace = true
 test-controls = { workspace = true, optional = true }
 tokio.workspace = true

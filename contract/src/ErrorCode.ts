@@ -3,4 +3,4 @@
 /**
  * The code of every error under `/api/` and `/test-controls/`.
  */
-export type ErrorCode = "notFound";
+export type ErrorCode = "badRequest" | "notFound" | "internal";

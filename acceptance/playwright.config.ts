@@ -1,12 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
 import { apiPlayer, apiServer } from "./drivers/api";
+import { controls } from "./drivers/controls";
 import { uiPlayer } from "./drivers/ui";
 import type { Options } from "./dsl";
 import type { Drivers } from "./dsl/drivers";
 
-const api: Drivers = { player: apiPlayer, server: apiServer };
-const ui: Drivers = { player: uiPlayer, server: apiServer };
+const api: Drivers = { player: apiPlayer, server: apiServer, controls };
+const ui: Drivers = { player: uiPlayer, server: apiServer, controls };
 
 export default defineConfig<Options>({
   globalSetup: "./global-setup.ts",

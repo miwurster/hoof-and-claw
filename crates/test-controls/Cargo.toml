@@ -7,6 +7,17 @@ publish.workspace = true
 
 [dependencies]
 axum.workspace = true
+futures-channel.workspace = true
+futures-util.workspace = true
+game = { workspace = true, features = ["test-controls"] }
+jiff.workspace = true
+prices.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+ts-rs.workspace = true
+
+[dev-dependencies]
+futures-executor.workspace = true
 
 [lints]
 workspace = true

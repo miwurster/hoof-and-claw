@@ -8,10 +8,22 @@ export type Connection = {
   readonly request: APIRequest;
 };
 
-/** One Player's channel to the game: the page in a browser, or the HTTP API and its stream. */
+/**
+ * One Player's channel to the game: the page in a browser, or the HTTP API and its stream.
+ * Prices are dollar strings such as "64,000.00", and `null` is no price at all.
+ */
 export type PlayerDriver = {
   readonly opensAnUnknownPage: () => Promise<void>;
+  readonly opensTheGame: () => Promise<void>;
   readonly expectsTheGame: () => Promise<void>;
+  readonly expectsPrice: (price: string | null) => Promise<void>;
+  readonly expectsPriceDelayed: (delayed: boolean) => Promise<void>;
+  readonly expectsScore: (score: number) => Promise<void>;
+  readonly expectsNoOpenGuess: () => Promise<void>;
+  readonly expectsGuessing: (possible: boolean) => Promise<void>;
+  readonly expectsAnIdentity: () => Promise<void>;
+  readonly expectsAnnouncement: (announcement: "Price delayed" | "Price live") => Promise<void>;
+  readonly expectsWhereTheScoreLives: () => Promise<void>;
   readonly close: () => Promise<void>;
 };
 
@@ -32,6 +44,19 @@ export type ServerDriver = {
   readonly health: () => Promise<Health>;
   readonly missingGameRoute: () => Promise<Missing>;
   readonly missingTestControl: () => Promise<Missing>;
+  /** The server's time, an RFC 3339 timestamp. */
+  readonly time: () => Promise<string>;
+  readonly close: () => Promise<void>;
+};
+
+/** The test controls: the Price source and the clock. Prices are dollar strings such as "64,000.00". */
+export type ControlsDriver = {
+  readonly sendsPrice: (price: string) => Promise<void>;
+  readonly setsConnected: (connected: boolean) => Promise<void>;
+  readonly advancesClock: (milliseconds: number) => Promise<void>;
+  readonly setsClock: (time: string) => Promise<void>;
+  /** Puts the Price source back into its start state: Price delayed and no price. */
+  readonly resetsPriceSource: () => Promise<void>;
   readonly close: () => Promise<void>;
 };
 
@@ -39,4 +64,5 @@ export type ServerDriver = {
 export type Drivers = {
   readonly player: (connection: Connection) => Promise<PlayerDriver>;
   readonly server: (connection: Connection) => Promise<ServerDriver>;
+  readonly controls: (connection: Connection) => Promise<ControlsDriver>;
 };
