@@ -1,0 +1,9 @@
+{
+  "name": "contract",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./test-controls": "./src/test-controls/index.ts"
+  }
+}

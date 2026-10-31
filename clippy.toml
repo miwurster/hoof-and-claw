@@ -1,0 +1,11 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true
+allow-indexing-slicing-in-tests = true
+
+# The domain's time comes only from the Clock port; only the system clock adapter in `server` reads it.
+disallowed-methods = [
+  { path = "std::time::SystemTime::now", reason = "read the time through the Clock port" },
+  { path = "std::time::Instant::now", reason = "read the time through the Clock port" },
+]

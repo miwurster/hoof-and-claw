@@ -1,0 +1,21 @@
+{
+  "name": "hoof-and-claw",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": "24.21.0"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.78.0",
+    "@types/node": "26.6.6",
+    "eslint-plugin-playwright": "2.12.1",
+    "oxlint": "1.78.0",
+    "oxlint-tsgolint": "7.0.2005",
+    "prettier": "3.9.10",
+    "stylelint": "17.16.0",
+    "stylelint-config-css-modules": "4.6.0",
+    "stylelint-config-standard": "40.0.0",
+    "typescript": "6.0.3"
+  }
+}
