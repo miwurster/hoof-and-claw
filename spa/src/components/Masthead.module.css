@@ -1,0 +1,24 @@
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-wordmark);
+  font-weight: var(--font-weight-wordmark);
+}
+
+.mark {
+  width: var(--size-mark);
+  height: var(--size-mark);
+  border-radius: var(--radius-tile);
+}
+
+.ampersand {
+  color: var(--color-horn);
+}

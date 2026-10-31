@@ -1,0 +1,10 @@
+/target/
+node_modules/
+/spa/dist/
+/acceptance/test-results/
+/acceptance/playwright-report/
+/acceptance/blob-report/
+*.db
+*.db-shm
+*.db-wal
+.DS_Store

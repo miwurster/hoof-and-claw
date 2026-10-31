@@ -1,0 +1,147 @@
+# Every task of the repo, the Green gate included (ADR 0012, ADR 0013).
+# The Rust toolchain is pinned in rust-toolchain.toml (ADR 0006).
+
+[tools]
+node = "24.21.0"
+pnpm = "12.16.1"
+"aqua:nextest-rs/nextest/cargo-nextest" = "0.9.150"
+cargo-deny = "0.20.2"
+"github:Boshen/cargo-shear" = "1.14.0"
+"cargo:sqlx-cli" = { version = "0.9.0", features = "sqlite", default-features = false, locked = false }
+
+[env]
+_.path = ["node_modules/.bin"]
+
+# Launch: a local server with the test controls, as the acceptance suite and verification start it.
+
+[tasks."build:spa"]
+description = "Build the SPA into spa/dist"
+run = "pnpm --filter spa build"
+sources = ["spa/src/**/*", "spa/index.html", "spa/vite.config.ts", "spa/tsconfig.json", "spa/package.json", "assets/brand/*", "contract/src/**/*", "pnpm-lock.yaml"]
+outputs = ["spa/dist/index.html"]
+
+[tasks."build:launch"]
+description = "Build the SPA and the server with the test controls in the Cargo profile gate"
+depends = ["build:spa"]
+run = "cargo build --profile gate -p server --features test-controls --locked"
+
+[tasks.launch]
+description = "Start a server with the test controls: PORT=<port> DATABASE_PATH=<file> mise run launch"
+depends = ["build:launch"]
+run = 'RENDER_GIT_COMMIT="$(git rev-parse HEAD)" exec target/gate/server'
+
+# The parts of the Green gate, each runnable alone.
+
+[tasks."gate:rust-format"]
+run = "cargo fmt --all --check"
+
+[tasks."gate:clippy"]
+run = "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings"
+
+[tasks."gate:sqlx"]
+description = "Check the committed offline query metadata against a freshly migrated database"
+run = '''
+set -eu
+dir="$(mktemp -d)"
+trap 'rm -rf "$dir"' EXIT
+export DATABASE_URL="sqlite://$dir/sqlx.db"
+sqlx database create
+sqlx migrate run --source crates/sqlite/migrations
+cargo sqlx prepare --workspace --check -- --all-targets --all-features --locked
+'''
+
+[tasks."gate:deny"]
+run = "cargo deny --all-features check --deny warnings"
+
+[tasks."gate:shear"]
+run = "cargo shear"
+
+[tasks.contract]
+description = "Regenerate the TypeScript types of the API contract in contract/"
+run = '''
+set -eu
+rm -rf contract/src
+cargo test --locked -p web -p test-controls export_bindings
+node tools/contract/write-index.ts
+'''
+
+[tasks."gate:contract"]
+description = "Fail when the checked-in contract differs from the wire types"
+depends = ["contract"]
+run = '''
+set -eu
+untracked="$(git ls-files --others --exclude-standard -- contract)"
+if ! git --no-pager diff --exit-code -- contract || [ -n "$untracked" ]; then
+  echo "$untracked"
+  echo "contract/ differs from the wire types: run 'mise run contract' and commit the result" >&2
+  exit 1
+fi
+'''
+
+[tasks."gate:rust-tests"]
+run = '''
+set -eu
+cargo nextest run --workspace --all-features --locked --no-tests=pass
+cargo test --doc --workspace --all-features --locked
+'''
+
+[tasks."gate:release-build"]
+description = "Check that the release build compiles, and that it contains no test-controls"
+run = '''
+set -eu
+cargo check --release -p server --locked
+cargo nextest run -p server --test architecture --locked release_build_has_no_test_controls
+'''
+
+[tasks."gate:ts-format"]
+run = "prettier --check ."
+
+[tasks."gate:oxlint"]
+run = "oxlint --type-aware --deny-warnings"
+
+[tasks."gate:stylelint"]
+run = "stylelint --max-warnings 0 'spa/src/**/*.css'"
+
+[tasks."gate:typecheck"]
+run = "pnpm --recursive --if-present run typecheck && tsc -p tools"
+
+[tasks."gate:depcruise"]
+run = "pnpm --recursive --if-present run depcruise"
+
+[tasks."gate:vitest"]
+run = "pnpm --filter spa test"
+
+[tasks.browsers]
+description = "Install the Playwright Chromium the acceptance suite drives"
+run = "pnpm --filter acceptance exec playwright install chromium"
+
+[tasks.acceptance]
+description = "Run the acceptance suite in the projects ui and api"
+depends = ["browsers"]
+run = "pnpm --filter acceptance test"
+
+[tasks.perf]
+description = "Run the performance cases and their budgets"
+depends = ["browsers"]
+run = "pnpm --filter acceptance perf"
+
+[tasks.gate]
+description = "The Green gate: every rule, failing on any warning"
+run = [
+  { task = "gate:rust-format" },
+  { task = "gate:ts-format" },
+  { task = "gate:contract" },
+  { task = "gate:clippy" },
+  { task = "gate:sqlx" },
+  { task = "gate:deny" },
+  { task = "gate:shear" },
+  { task = "gate:rust-tests" },
+  { task = "gate:release-build" },
+  { task = "gate:oxlint" },
+  { task = "gate:stylelint" },
+  { task = "gate:typecheck" },
+  { task = "gate:depcruise" },
+  { task = "gate:vitest" },
+  { task = "acceptance" },
+  { task = "perf" },
+]

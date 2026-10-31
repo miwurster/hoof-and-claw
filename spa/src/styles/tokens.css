@@ -1,0 +1,38 @@
+/* The design tokens of docs/design/visual-direction.md; the only place that names a raw colour. */
+:root {
+  /* Palette */
+  --color-loam: #1c1a16;
+  --color-turf: #2a2721;
+  --color-bone: #ede6d6;
+  --color-flint: #8f887a;
+  --color-pasture: #a9d79b;
+  --color-rust: #d0533a;
+  --color-horn: #d4b26a;
+
+  /* Type: Geist Sans only */
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-size-small: 0.875rem;
+  --font-size-body: 1rem;
+  --font-size-wordmark: 1.25rem;
+  --font-size-price: 3rem;
+  --font-weight-wordmark: 600;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Radii */
+  --radius-tile: 0.375rem;
+  --radius-card: 0.75rem;
+
+  /* Sizes */
+  --size-mark: 2rem;
+  --width-column: 28rem;
+
+  /* Keyboard focus: Horn only */
+  --focus-ring: 2px solid var(--color-horn);
+}

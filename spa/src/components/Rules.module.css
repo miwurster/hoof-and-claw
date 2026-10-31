@@ -1,0 +1,9 @@
+.rules {
+  color: var(--color-flint);
+  font-size: var(--font-size-small);
+  text-align: center;
+}
+
+.rules p {
+  margin: 0 0 var(--space-1);
+}

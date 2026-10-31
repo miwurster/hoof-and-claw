@@ -1,0 +1,18 @@
+{
+  "name": "acceptance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test --project ui --project api",
+    "perf": "playwright test --project performance --pass-with-no-tests",
+    "typecheck": "tsc --noEmit",
+    "depcruise": "depcruise cases performance dsl drivers --config .dependency-cruiser.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "contract": "workspace:*",
+    "dependency-cruiser": "18.7.0",
+    "typescript": "6.0.3"
+  }
+}

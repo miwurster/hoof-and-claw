@@ -1,0 +1,68 @@
+# cargo-deny: advisories, licences, duplicate crates, sources, and which crates may wrap infrastructure (ADR 0006, ADR 0008).
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+
+[licenses]
+confidence-threshold = 0.93
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "MIT",
+  "Unicode-3.0",
+  "Zlib",
+]
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+allow-wildcard-paths = true
+skip = [
+  { crate = "syn@2", reason = "the ecosystem is moving to syn 3; clap_derive already has" },
+  { crate = "hashbrown@0.16", reason = "sqlx's hashlink lags behind indexmap's hashbrown" },
+]
+
+[[bans.deny]]
+crate = "openssl"
+reason = "TLS goes through rustls (ADR 0006)"
+
+[[bans.deny]]
+crate = "openssl-sys"
+reason = "TLS goes through rustls (ADR 0006)"
+
+# Only the crates in ARCHITECTURE.md's table may depend directly on these, besides the third-party crates built on them.
+# A wrapper a crate of the table does not use yet is added with the crate, because cargo-deny warns on an unused one.
+[[bans.deny]]
+crate = "tokio"
+wrappers = [
+  "server",
+  # third-party
+  "axum", "hyper", "hyper-util", "sqlx-core", "sqlx-macros-core", "tokio-stream", "tokio-util", "tower", "tower-http",
+]
+reason = "only `game`, `bitstamp`, `sqlite`, `web`, `test-controls` and `server` may use tokio directly"
+
+[[bans.deny]]
+crate = "sqlx"
+wrappers = ["sqlite"]
+reason = "only the `sqlite` adapter talks to the database"
+
+[[bans.deny]]
+crate = "axum"
+wrappers = ["web", "test-controls", "server"]
+reason = "only `web`, `test-controls` and `server` serve HTTP"
+
+[[bans.deny]]
+crate = "tower-http"
+wrappers = ["web"]
+reason = "only `web` serves HTTP"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

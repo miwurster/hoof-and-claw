@@ -1,0 +1,10 @@
+# Prose is written one sentence per line, not reflowed.
+*.md
+target/
+**/dist/
+pnpm-lock.yaml
+acceptance/test-results/
+acceptance/playwright-report/
+tools/oxlint/anti-slop/
+crates/sqlite/.sqlx/
+contract/src/
