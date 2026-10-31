@@ -5,7 +5,7 @@ Agents write the code, and the engineer does not read Rust fluently, so quality 
 Rust gives more of those guardrails for free than TypeScript.
 The compiler rejects whole classes of bugs, and a crate that does not depend on an adapter cannot import it, so the ports-and-adapters dependency rules fail the build instead of a separate check.
 The cost is two languages in one repo and slower builds in the agent loop.
-The evidence behind each choice is in the [research on Rust project standards](https://github.com/miwurster/hoof-and-claw/blob/research/rust-project-standards/docs/research/rust-project-standards.md).
+The evidence behind each choice is in the [research on Rust project standards](../research/rust-project-standards.md).
 
 ## Stack
 

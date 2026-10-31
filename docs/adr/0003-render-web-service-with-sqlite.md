@@ -10,7 +10,7 @@ One always-on process is the simplest design that meets every rule of the brief,
 - **AWS serverless: CloudFront, S3, Lambda in Rust, DynamoDB, an EventBridge Scheduler call per guess.** Not chosen for the demo; it is the first candidate on the scale path.
   It costs about 0 to 2 USD a month and matches "AWS preferred".
   A scheduler call per guess is too coarse: EventBridge Scheduler fires with 60-second precision, so a guess nobody watches resolves up to about two minutes after it falls due.
-  A Rust Lambda can instead hold the price feed in overlapping 15-minute runs started every 13 minutes, within the free tier, and resolve due guesses on every trade ("AWS serverless for the game", branch `research/aws-serverless-for-the-game`).
+  A Rust Lambda can instead hold the price feed in overlapping 15-minute runs started every 13 minutes, within the free tier, and resolve due guesses on every trade (research "[AWS serverless for the game](../research/aws-serverless-for-the-game.md)").
   It still gives up one clock, because accepting a guess and receiving prices run on different machines (ADR 0002), and push, because browsers poll a cached price; CloudFront cannot share one SSE stream across viewers.
   A crashed run can leave the feed down for minutes.
   Push services such as AppSync Events or IoT Core charge about 1 USD per million messages, so one price a second to 1,000 Players costs about 2,600 USD a month.
@@ -81,7 +81,7 @@ What each step means for the application:
 
 - **1,000 Players.** The same single process and SQLite are enough on a larger Render instance.
   Prices stay on the game server's own SSE stream.
-  A managed push service such as AppSync Events or IoT Core charges about 1 USD per million messages, about 2,600 USD a month for one price a second to 1,000 Players, and CloudFront cannot share one SSE stream across viewers, so bandwidth on the game server stays the cheapest channel ("Scaling the game process" and "AWS serverless for the game", branches `research/scaling-the-game-process` and `research/aws-serverless-for-the-game`).
+  A managed push service such as AppSync Events or IoT Core charges about 1 USD per million messages, about 2,600 USD a month for one price a second to 1,000 Players, and CloudFront cannot share one SSE stream across viewers, so bandwidth on the game server stays the cheapest channel (research "[Scaling the game process](../research/scaling-the-game-process.md)" and "[AWS serverless for the game](../research/aws-serverless-for-the-game.md)").
 - **10,000 Players.** One larger process with 2 CPU and 2 to 4 GB still carries the connections and about 420 writes a second, with writes batched into one transaction per price.
   It has no redundancy, and a deploy drops 10,000 connections at once, so clients reconnect with random delay.
   Availability forces a change before capacity does: Render runs zero-downtime deploys only without a disk, so SQLite gives way to managed Postgres behind the store port, and a Postgres advisory lock picks the one process that holds the feed and resolves.

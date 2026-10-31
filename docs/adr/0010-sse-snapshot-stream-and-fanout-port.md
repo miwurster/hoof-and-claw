@@ -4,7 +4,7 @@ Each tab opens one server-sent events (SSE) stream, and its first event is a sna
 After that the stream carries price changes, at most one a second for the whole server, and every event about the tab's Player.
 The `game` crate resolves Open guesses on every trade it receives, saves the resolutions before it publishes them, and hands all events to a `Fanout` port.
 At demo scale the port has an in-process adapter, and its seam is where prices and Player events leave the process on the scale path.
-This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time delivery; the research behind it is "Real-time patterns for price fan-out and guess resolution at three scales".
+This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time delivery; the research behind it is "[Real-time patterns for price fan-out and guess resolution at three scales](../research/real-time-patterns.md)".
 
 ## Decision
 
