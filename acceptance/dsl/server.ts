@@ -23,6 +23,12 @@ export class Server {
 
         expect(missing, "the server should find no missing game route").toEqual(NOT_FOUND);
       },
+      /** Tells the time on the server's clock, an RFC 3339 time such as "2027-03-01T08:30:00Z". */
+      tellTheTime: async (time: string): Promise<void> => {
+        const told = await driver.time();
+
+        expect(Date.parse(told), `the server should tell the time ${time}, but tells ${told}`).toBe(Date.parse(time));
+      },
       findNothingAtAMissingTestControl: async (): Promise<void> => {
         const missing = await driver.missingTestControl();
 

@@ -42,7 +42,7 @@ reason = "TLS goes through rustls (ADR 0006)"
 [[bans.deny]]
 crate = "tokio"
 wrappers = [
-  "server",
+  "game", "server",
   # third-party
   "axum", "hyper", "hyper-util", "sqlx-core", "sqlx-macros-core", "tokio-stream", "tokio-util", "tower", "tower-http",
 ]

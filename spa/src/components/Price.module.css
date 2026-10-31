@@ -1,0 +1,37 @@
+.board {
+  text-align: center;
+}
+
+.board p {
+  margin: 0;
+}
+
+.price {
+  font-size: var(--font-size-price);
+  font-variant-numeric: tabular-nums;
+}
+
+.delayedPrice {
+  composes: price;
+  color: var(--color-flint);
+}
+
+.label {
+  display: block;
+}
+
+.pair,
+.label {
+  color: var(--color-flint);
+  font-size: var(--font-size-small);
+}
+
+/* Read by a screen reader, not shown. */
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

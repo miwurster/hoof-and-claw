@@ -1,0 +1,30 @@
+.directions {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: center;
+}
+
+.direction {
+  min-width: 8rem;
+  padding: var(--space-3) var(--space-6);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-turf);
+  font: inherit;
+  cursor: pointer;
+}
+
+.direction:disabled {
+  color: var(--color-flint);
+  cursor: not-allowed;
+}
+
+.up {
+  composes: direction;
+  color: var(--color-pasture);
+}
+
+.down {
+  composes: direction;
+  color: var(--color-rust);
+}
