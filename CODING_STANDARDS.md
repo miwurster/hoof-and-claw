@@ -30,7 +30,19 @@ What the compiler, Clippy, Oxlint, anti-slop, Stylelint or cargo-deny already en
 ## Errors
 
 - The cores and adapters return `Result` with an enum error type built with `thiserror`.
-- The HTTP layer maps each domain error to a status code explicitly, never through a catch-all.
+- The HTTP layer maps each domain error to a status code and an error code explicitly, never through a catch-all.
+- Every error under `/api/` and `/test-controls/` is `{ "error": "<code>" }` with a code from the generated error enum, the axum extractors' rejections and the rate limiter's answer included; no route answers with plain text or HTML.
+
+## API contract
+
+ADR 0014 fixes the routes, payloads and status codes.
+
+- A wire type is never a domain type: `web` converts between them, so a change in a core does not change the contract by accident.
+- JSON field names are camelCase; prices on the wire are integer cents; enum values are lower camelCase strings (`"up"`, `"correct"`).
+- An SSE event is one JSON object in `data:` with a `type` field, with no `event:`, `id:` or `retry:` field.
+- An event carries absolute values, never deltas, so applying it twice changes nothing.
+- The client decodes a response body or an event in exactly one place, the game hook, with one `as` to the generated type.
+- Only the game hook reconnects the stream; it closes the old `EventSource` first and waits a random, growing delay.
 
 ## Lint exceptions
 

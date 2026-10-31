@@ -11,7 +11,7 @@ A rule without a test name is convention.
 ## Workspaces
 
 - A Cargo virtual workspace holds the server's crates, flat under `crates/`.
-- A pnpm workspace holds the TypeScript packages: the SPA in `spa/` and the acceptance suite in `acceptance/`.
+- A pnpm workspace holds the TypeScript packages: the SPA in `spa/`, the acceptance suite in `acceptance/`, and the generated API types in `contract/`.
 - `mise` defines every task, the Green gate included; there is no other task runner and no Nx.
 
 ## Server: crates cut by area of the domain
@@ -21,17 +21,17 @@ Each area's core is a synchronous crate that takes time and prices as values and
 A pure crate does no I/O, starts no async runtime and reads no clock.
 `game` is the one asynchronous shell that runs the cores; adapters are named after their technology and plug into ports the cores own.
 
-| Crate           | Kind         | Holds                                                                                                                      | May depend on                                    |
-| --------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `prices`        | core, sync   | Price, Price source, the latest price, Price delayed, the `PriceSource` port                                               | `thiserror`, pure crates                         |
-| `guessing`      | core, sync   | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due guesses, its store port | `prices`, `thiserror`, pure crates               |
-| `identity`      | core, sync   | issuing and checking the anonymous token, token to Player ID, its store port                                               | `guessing`, `thiserror`, pure crates             |
-| `game`          | shell, async | runs the cores on received prices, persists before it acknowledges, publishes events; owns the `Clock` and `Fanout` ports  | the cores, `tokio`                               |
-| `bitstamp`      | adapter      | `PriceSource` over Bitstamp's WebSocket feed and REST seed                                                                 | `prices`, `tokio`, `tokio-tungstenite`, `rustls` |
-| `sqlite`        | adapter      | every core's store port on one database file and one write connection                                                      | the cores, `sqlx`                                |
-| `web`           | adapter      | axum routes, the SSE stream, the identity cookie, static files                                                             | `game`, the cores, `axum`, `tower-http`          |
-| `server`        | binary       | configuration, wiring, start-up                                                                                            | every crate above                                |
-| `test-controls` | test adapter | the controllable `Clock` and `PriceSource` and the HTTP endpoints that drive them                                          | `game`, `prices`, `axum`                         |
+| Crate           | Kind         | Holds                                                                                                                      | May depend on                                             |
+| --------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `prices`        | core, sync   | Price, Price source, the latest price, Price delayed, the `PriceSource` port                                               | `thiserror`, pure crates                                  |
+| `guessing`      | core, sync   | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due guesses, its store port | `prices`, `thiserror`, pure crates                        |
+| `identity`      | core, sync   | issuing and checking the anonymous token, token to Player ID, its store port                                               | `guessing`, `thiserror`, pure crates                      |
+| `game`          | shell, async | runs the cores on received prices, persists before it acknowledges, publishes events; owns the `Clock` and `Fanout` ports  | the cores, `tokio`                                        |
+| `bitstamp`      | adapter      | `PriceSource` over Bitstamp's WebSocket feed and REST seed                                                                 | `prices`, `tokio`, `tokio-tungstenite`, `rustls`          |
+| `sqlite`        | adapter      | every core's store port on one database file and one write connection                                                      | the cores, `sqlx`                                         |
+| `web`           | adapter      | axum routes, the SSE stream, the identity cookie, static files, the wire types of the API contract                         | `game`, the cores, `axum`, `tower-http`, `serde`, `ts-rs` |
+| `server`        | binary       | configuration, wiring, start-up                                                                                            | every crate above                                         |
+| `test-controls` | test adapter | the controllable `Clock` and `PriceSource`, the HTTP endpoints that drive them, and their wire types                       | `game`, `prices`, `axum`, `serde`, `ts-rs`                |
 
 The "May depend on" column is enforced by `crate_graph_follows_the_table` in `crates/server/tests/architecture.rs`, which reads `cargo metadata`.
 Only the crates in the table may depend directly on `tokio`, `sqlx`, `axum`, `tower-http` and `tokio-tungstenite`; enforced by cargo-deny `wrappers` in `deny.toml`.
@@ -70,6 +70,18 @@ No module is called `models`, `services`, `repositories`, `utils` or `helpers`; 
 `test-controls` is compiled into `server` only with the Cargo feature `test-controls`.
 The release build must not contain it; enforced by `release_build_has_no_test_controls` in the Green gate.
 
+## API contract: `contract/`
+
+The routes, payloads and errors between the SPA and the server are fixed in ADR 0014.
+
+- The wire types are serde types in `web`, and in `test-controls` for the test controls, separate from the domain types of the cores.
+  `ts-rs` generates their TypeScript types into `contract/`.
+- `contract/` holds only generated files, checked in and never edited by hand.
+  The Green gate regenerates them and fails on any difference.
+- Its main export holds the game's types; `contract/test-controls` holds the test controls' types.
+- `spa/` imports only the main export; enforced by `spa-skips-the-test-controls-contract` in `spa/.dependency-cruiser.cjs`.
+- In `acceptance/`, only `drivers/api/` imports the main export and only `drivers/controls/` imports `contract/test-controls`; enforced by `acceptance/.dependency-cruiser.cjs`.
+
 ## SPA: `spa/`
 
 A client-rendered Vite and React app, served as static files by the game server from the same origin.
@@ -77,6 +89,7 @@ A client-rendered Vite and React app, served as static files by the game server 
 - **Routes.** TanStack Router with routes defined in code under `spa/src/routes/`; no file-based routing and no route loaders.
 - **State.** One pure reducer in `spa/src/game/` takes the state and a server event or a user action and returns the new state.
   One thin hook beside it owns the `EventSource` and the `fetch` calls and feeds the reducer.
+  The reducer's server events are the `ServerEvent` union from `contract/`.
   There is no data library (no TanStack Query, Redux or Zustand).
 - **Containers and presentational components.** One container per route wires the hook to presentational components.
   A presentational component receives only props and callbacks and never imports the hook, `fetch` or `EventSource`; enforced by `presentational-components-skip-the-data-layer` in `spa/.dependency-cruiser.cjs`.
@@ -87,13 +100,13 @@ A client-rendered Vite and React app, served as static files by the game server 
 
 A Playwright Test package in Dave Farley's four layers, one folder each:
 
-| Folder              | Holds                                                                            | May import               |
-| ------------------- | -------------------------------------------------------------------------------- | ------------------------ |
-| `cases/`            | test cases in glossary terms                                                     | `dsl/`                   |
-| `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface     |
-| `drivers/ui/`       | the driver for the SPA in a browser                                              | Playwright               |
-| `drivers/api/`      | the driver for the HTTP API and the SSE stream                                   | Playwright's request API |
-| `drivers/controls/` | calls to the `test-controls` endpoints                                           | Playwright's request API |
+| Folder              | Holds                                                                            | May import                                         |
+| ------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `cases/`            | test cases in glossary terms                                                     | `dsl/`                                             |
+| `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface                               |
+| `drivers/ui/`       | the driver for the SPA in a browser                                              | Playwright                                         |
+| `drivers/api/`      | the driver for the HTTP API and the SSE stream                                   | Playwright's request API, `contract/`              |
+| `drivers/controls/` | calls to the `test-controls` endpoints                                           | Playwright's request API, `contract/test-controls` |
 
 No driver imports another; enforced by `acceptance/.dependency-cruiser.cjs`.
 Every case runs in the Playwright projects `ui` and `api`; a case limited to one carries that project's tag with the reason beside it.

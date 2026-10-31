@@ -58,7 +58,7 @@ All of these run in the Green gate, and any warning fails it.
 - The acceptance test suite talks to the server over HTTP and the UI, so it may use another language.
   ADR 0011 chooses TypeScript with Playwright.
 - The frontend shares no code with the server.
-  How its types follow the server's API is part of the API contract.
+  Its types are generated from the server's wire types with `ts-rs` (ADR 0014).
 - axum 0.8 has unreleased breaking changes queued, so a 0.9 release during the demo means a small migration.
 - sqlx 0.9 requires Rust 1.94, and `sqlx-cli` is pinned with `--version`, because `cargo install --locked` no longer works for it.
 - Render does not document whether a `nonroot` container may write to its persistent disk.

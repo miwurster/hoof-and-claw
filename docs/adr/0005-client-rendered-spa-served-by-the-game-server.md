@@ -24,14 +24,14 @@ A second server that renders pages would show a price that is a second old by th
 
 - **Serving.** File names with a content hash are served with `Cache-Control: public, max-age=31536000, immutable`.
   `index.html` is served `no-cache`, so the next page load after a deploy picks up the new build.
-  Any path that is neither an API route nor a file falls back to `index.html`, so deep links work once there are more routes.
+  Any path that is neither a file nor under `/api/` or `/test-controls/` falls back to `index.html`, so deep links work once there are more routes (ADR 0014).
 - **Routing.** TanStack Router with routes defined in code, and for now the single route `/`.
   The demo uses no file-based routing and no route loaders.
 - **Transport.** Each tab opens one SSE stream that carries prices and the events of its own Player, identified by the cookie.
   The server pushes a resolution event with the Outcome, End price and new Score the moment it resolves a guess, so the client never polls.
   HTTP is used for reading the Player's current state and for placing a Guess.
   The first event on every stream is a snapshot of the Player's state, so after a reconnect the client rebuilds its state from it (ADR 0010).
-- **Countdown.** The server sends the time remaining on the Open guess, or its due time together with the server's current time.
+- **Countdown.** The server sends the time remaining on the Open guess as `remainingMs`, together with the server's current time (ADR 0014).
   The client counts down from when it received that message and never compares against its own clock.
   At zero the UI shows "Waiting for the price to move…" and decides nothing itself; only the server's resolution event ends the Open guess.
 - **Client state.** One pure reducer takes the state and a server event or a user action and returns the new state.
