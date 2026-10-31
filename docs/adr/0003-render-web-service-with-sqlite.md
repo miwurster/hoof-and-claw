@@ -31,7 +31,7 @@ One always-on process is the simplest design that meets every rule of the brief,
   Open guesses survive, because the server persists a guess before it acknowledges it, and they resolve on the first changed price after the restart (see ADR 0002).
 - SSE streams and the feed close on every deploy.
   Clients reconnect and rebuild their state from the snapshot that opens every stream (ADR 0010), and the server sends SSE heartbeats, because Render documents no timeout for streaming responses.
-  The acceptance suite holds an SSE stream open for more than an hour against the deployed service.
+  A check run by hand after the first Release holds an SSE stream open for an hour against the deployed service (ADR 0013).
 - The server pushes at most one price per second to browsers, and only when it changed.
   Resolution still uses every price it receives.
   At 20 viewers for 4 hours a day this is about 1.3 GB a month, inside the 5 GB Render includes.
@@ -44,8 +44,8 @@ One always-on process is the simplest design that meets every rule of the brief,
   Render snapshots the disk daily, but Render advises against restoring a database from a snapshot, so losing the disk resets every Score to 0.
   For a three-month demo we accept that risk.
   The scale path adds continuous replication to object storage, for example with Litestream.
-- GitHub Actions builds a Docker image, pushes it to the public GitHub Container Registry, and Render deploys that image, so the image that passed the Green gate is the one that runs and no Render build minutes are spent.
-- Terraform with the `render-oss/render` provider describes the service, disk, domain, health check and environment, and keeps its state in HCP Terraform Free.
+- Render builds the Dockerfile from a `release` branch and deploys it; a Release fast-forwards `release` to a `main` commit whose Green gate passed, and every Release spends Render build minutes (ADR 0013).
+- Terraform with the `render-oss/render` provider, applied by hand, describes the service, its `release` branch, disk, domain, health check and environment, and keeps its state in HCP Terraform Free.
   All-Inkl has no Terraform provider, so the `CNAME` from `hoof-and-claw` to the service's `onrender.com` host is a one-time manual step.
 - Render shares outbound IP addresses per region, and nobody has yet checked that the chosen Price source and its fallback accept connections from Render Frankfurt.
   If one refuses, the fallback is the other source, then another Render region.

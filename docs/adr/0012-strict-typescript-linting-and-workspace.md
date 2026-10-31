@@ -33,9 +33,8 @@ dependency-cruiser enforces the layers of the acceptance suite (ADR 0011) and th
 
 - A **pnpm workspace** holds the TypeScript packages: the SPA and `acceptance/`, and later a package for shared API types if the API contract calls for one.
 - The **Cargo workspace** holds the server's crates (ADR 0008).
-- **One task runner**, such as `just` or `mise` tasks, defines the Green gate as one command.
+- **One task runner**, `mise`, defines the Green gate as one command (ADR 0013).
   Agents, CI and `docs/agents/verification.md` all call that command.
-  CI/CD chooses the runner.
 
 ## Considered Options
 
