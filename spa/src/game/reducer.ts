@@ -27,7 +27,9 @@ export type Action =
   | { readonly type: "received"; readonly event: ServerEvent; readonly at: number }
   | { readonly type: "guessing" }
   | { readonly type: "guessAnswered"; readonly guess: OpenGuess; readonly at: number }
-  | { readonly type: "guessFailed"; readonly error: ErrorCode | "network" };
+  | { readonly type: "guessFailed"; readonly error: ErrorCode | "network" }
+  /** The page lost its stream: it keeps the last price as delayed until a new snapshot arrives. */
+  | { readonly type: "streamLost" };
 
 /** Before the stream opens, the page knows no price and treats it as delayed. */
 export const initialState: GameState = {
@@ -81,6 +83,10 @@ function receive(state: GameState, event: ServerEvent, at: number): GameState {
 }
 
 export function reduce(state: GameState, action: Action): GameState {
+  if (action.type === "streamLost") {
+    return { ...state, delayed: true };
+  }
+
   if (action.type === "received") {
     return receive(state, action.event, action.at);
   }

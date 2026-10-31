@@ -3,10 +3,11 @@ import { expect } from "@playwright/test";
 import type { APIRequest, Browser, BrowserContext, Locator, Page, Route } from "@playwright/test";
 
 import { colour } from "./colours";
+import { identityCookie } from "./identity";
+import { Network } from "./network";
 import { WithoutTheApi } from "./without-the-api";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
-const IDENTITY = "__Host-player";
 const GUESSES = "**/api/guesses";
 
 /** The design token each standing of the difference is coloured with (docs/design/visual-direction.md). */
@@ -38,6 +39,7 @@ class UiPlayer extends WithoutTheApi {
   constructor(
     private readonly context: BrowserContext,
     private readonly page: Page,
+    private readonly network: Network,
     /** A further tab shares the first tab's browser context, and leaves closing it to the first tab. */
     private readonly furtherTab = false,
   ) {
@@ -54,7 +56,7 @@ class UiPlayer extends WithoutTheApi {
 
   /** Opens the game in a new page of the same browser, which shares the identity cookie. */
   async opensAnotherTab(): Promise<UiPlayer> {
-    const tab = new UiPlayer(this.context, await this.context.newPage(), true);
+    const tab = new UiPlayer(this.context, await this.context.newPage(), this.network, true);
 
     await tab.opensTheGame();
 
@@ -121,6 +123,18 @@ class UiPlayer extends WithoutTheApi {
 
   async opensTheGame(): Promise<void> {
     await this.page.goto("/");
+  }
+
+  losesTheNetwork(): Promise<void> {
+    this.network.cut();
+
+    return Promise.resolve();
+  }
+
+  regainsTheNetwork(): Promise<void> {
+    this.network.restore();
+
+    return Promise.resolve();
   }
 
   async expectsTheGame(): Promise<void> {
@@ -234,9 +248,7 @@ class UiPlayer extends WithoutTheApi {
   }
 
   async expectsNoIdentity(): Promise<void> {
-    const cookies = await this.context.cookies();
-
-    expect(cookies.find((cookie) => cookie.name === IDENTITY)).toBeUndefined();
+    expect(await identityCookie(this.context)).toBeUndefined();
   }
 
   async expectsGuessing(possible: boolean): Promise<void> {
@@ -249,14 +261,7 @@ class UiPlayer extends WithoutTheApi {
 
   async expectsAnIdentity(): Promise<void> {
     await expect
-      .poll(async () => {
-        const cookies = await this.context.cookies();
-        const cookie = cookies.find((candidate) => candidate.name === IDENTITY);
-
-        return cookie === undefined
-          ? undefined
-          : { path: cookie.path, httpOnly: cookie.httpOnly, secure: cookie.secure, sameSite: cookie.sameSite };
-      }, "the browser should hold an identity cookie")
+      .poll(() => identityCookie(this.context), "the browser should hold an identity cookie")
       .toEqual({ path: "/", httpOnly: true, secure: true, sameSite: "Lax" });
   }
 
@@ -277,15 +282,18 @@ class UiPlayer extends WithoutTheApi {
   }
 
   async close(): Promise<void> {
-    await (this.furtherTab ? this.page.close() : this.context.close());
+    await (this.furtherTab ? this.page.close() : Promise.all([this.context.close(), this.network.close()]));
   }
 }
 
 export async function uiPlayer(connection: Connection) {
+  // The relay carries the page to the server, so the UI driver can cut the Player's network.
+  const network = await Network.to(connection.baseURL);
+
   const context = await connection.browser.newContext({
-    baseURL: connection.baseURL,
+    baseURL: network.baseURL,
     extraHTTPHeaders: { "X-Forwarded-For": connection.network },
   });
 
-  return new UiPlayer(context, await context.newPage());
+  return new UiPlayer(context, await context.newPage(), network);
 }

@@ -95,6 +95,7 @@ async fn serve<C: Clock, F: Fanout, S: Store>(
             guess_burst: configuration.guess_rate_burst,
             cookies_per_hour: configuration.cookie_rate_per_hour,
             cookie_burst: configuration.cookie_rate_burst,
+            streams_per_ip: configuration.max_streams_per_ip,
         },
         test_controls,
     });

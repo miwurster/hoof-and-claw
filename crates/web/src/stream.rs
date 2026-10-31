@@ -1,10 +1,12 @@
 //! The game's routes under `/api/` that read: the snapshot and the stream of events.
 
 use std::convert::Infallible;
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use axum::Json;
-use axum::extract::{Extension, State};
+use axum::extract::{ConnectInfo, Extension, State};
+use axum::http::HeaderMap;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use futures_util::{Stream, StreamExt as _, stream};
 use game::{Clock, Fanout, Game, Store, Unavailable};
@@ -12,13 +14,17 @@ use guessing::PlayerId;
 use identity::Token;
 
 use crate::ErrorCode;
+use crate::client_ip::ClientIp;
 use crate::event::{PriceChanged, ServerEvent, Snapshot};
+use crate::streams_per_ip::StreamsPerIp;
 
 /// What the game's routes share.
 pub(crate) struct Api<C, F, S> {
     pub(crate) game: Game<C, F, S>,
     pub(crate) build: String,
     pub(crate) keepalive: Duration,
+    pub(crate) streams: StreamsPerIp,
+    pub(crate) client_ip: ClientIp,
 }
 
 impl<C: Clone, F: Clone, S: Clone> Clone for Api<C, F, S> {
@@ -27,6 +33,8 @@ impl<C: Clone, F: Clone, S: Clone> Clone for Api<C, F, S> {
             game: self.game.clone(),
             build: self.build.clone(),
             keepalive: self.keepalive,
+            streams: self.streams.clone(),
+            client_ip: self.client_ip.clone(),
         }
     }
 }
@@ -74,10 +82,21 @@ pub(crate) async fn snapshot<C: Clock, F: Fanout, S: Store>(
 
 /// One stream per tab: the snapshot first, then every published price and the Player's events, with a comment as
 /// keepalive (ADR 0010).
+///
+/// An IP that already holds `MAX_STREAMS_PER_IP` open streams is refused with `rateLimited`.
 pub(crate) async fn events<C: Clock, F: Fanout, S: Store>(
     State(api): State<Api<C, F, S>>,
     Extension(token): Extension<Token>,
+    connect_info: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: HeaderMap,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ErrorCode> {
+    let peer = connect_info.map(|Extension(ConnectInfo(peer))| peer);
+    // The place stays taken for as long as the stream below holds it, so it is freed when the tab disconnects. A
+    // request without any address is not capped, as with the cookie limit.
+    let place = match api.client_ip.of(&headers, peer) {
+        Some(ip) => Some(api.streams.open(ip).ok_or(ErrorCode::RateLimited)?),
+        None => None,
+    };
     // Subscribe before the snapshot, so an event published in between arrives as an event (ADR 0010).
     let (player, subscription) = api
         .game
@@ -87,10 +106,13 @@ pub(crate) async fn events<C: Clock, F: Fanout, S: Store>(
     let first = stream::once(std::future::ready(ServerEvent::Snapshot(
         api.snapshot(player).await?,
     )));
-    let later = stream::unfold(subscription, |mut subscription| async move {
-        let event = subscription.next().await?;
-        Some((ServerEvent::from(event), subscription))
-    });
+    let later = stream::unfold(
+        (subscription, place),
+        |(mut subscription, place)| async move {
+            let event = subscription.next().await?;
+            Some((ServerEvent::from(event), (subscription, place)))
+        },
+    );
     let events = first
         .chain(later)
         .filter_map(|event| std::future::ready(Event::default().json_data(event).ok().map(Ok)));
