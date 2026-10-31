@@ -99,6 +99,26 @@ pub async fn closing_ends_every_subscription(fanout: impl Fanout) {
     assert_eq!(fanout.subscribe(Some(player(1))).next().await, None);
 }
 
+/// On shutdown the game publishes Price delayed and then closes, so every page shows Price delayed (ADR 0007).
+pub async fn a_price_published_just_before_closing_reaches_every_subscription_before_it_ends(
+    fanout: impl Fanout,
+) {
+    let mut unread = fanout.subscribe(None);
+    let mut read = fanout.subscribe(Some(player(1)));
+    fanout.publish_price(live(6_400_000));
+    assert_eq!(read.next().await, Some(price(6_400_000)));
+    let mut delayed = live(6_400_000);
+    delayed.apply(Report::Delayed);
+
+    fanout.publish_price(delayed);
+    fanout.close();
+
+    assert_eq!(unread.next().await, Some(Event::Price(delayed)));
+    assert_eq!(unread.next().await, None);
+    assert_eq!(read.next().await, Some(Event::Price(delayed)));
+    assert_eq!(read.next().await, None);
+}
+
 pub async fn a_players_event_reaches_every_stream_of_that_player_and_no_other(fanout: impl Fanout) {
     let alice = player(1);
     let mut first_tab = fanout.subscribe(Some(alice));

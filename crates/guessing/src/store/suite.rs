@@ -233,3 +233,23 @@ pub async fn resolutions_saved_together_move_each_players_own_score(store: impl 
     assert_eq!(store.standing(alice).await.unwrap().score, Score::new(1));
     assert_eq!(store.standing(bob).await.unwrap().score, Score::new(-1));
 }
+
+pub async fn the_open_guesses_are_every_players_open_guess_and_no_resolved_one(store: impl Store) {
+    let alice = player(1);
+    let bob = player(2);
+    let carol = player(3);
+    let alices = guess(alice, 10, Direction::Up);
+    let bobs = guess(bob, 20, Direction::Down);
+    let carols = guess(carol, 30, Direction::Up);
+    for placed in [alices, bobs, carols] {
+        store.place(&placed).await.unwrap();
+    }
+    store.resolve(&[resolved(bobs, 100, None)]).await.unwrap();
+
+    let mut open = store.open_guesses().await.unwrap();
+    open.sort_by_key(|guess| guess.id);
+
+    let mut expected = vec![alices, carols];
+    expected.sort_by_key(|guess| guess.id);
+    assert_eq!(open, expected);
+}

@@ -10,10 +10,21 @@ const READY = /listening on \S+:(\d+)/u;
 const START_TIMEOUT_MS = 180_000;
 const STOP_TIMEOUT_MS = 20_000;
 
+/** How a server stopped on `SIGTERM`: how long it took, and whether it had to be killed. */
+export type Stopped = {
+  readonly milliseconds: number;
+  readonly killed: boolean;
+};
+
 export type ServerProcess = {
   readonly baseURL: string;
   readonly build: string;
   readonly log: () => string;
+  /** Sends `SIGTERM`, as Render does on a deploy, and keeps the database for `startsAgain`. */
+  readonly stops: () => Promise<Stopped>;
+  /** Starts the server again on the same port and database, as after a deploy. */
+  readonly startsAgain: () => Promise<void>;
+  readonly isRunning: () => boolean;
   readonly stop: () => Promise<void>;
 };
 
@@ -25,12 +36,42 @@ export function launchedCommit(): string {
 /** Starts a server on an empty database and resolves once it logs that it is listening. */
 export async function startServer(): Promise<ServerProcess> {
   const dir = mkdtempSync(join(tmpdir(), "hoof-and-claw-"));
+  const database = join(dir, "game.db");
   const lines: string[] = [];
+  let launched = await launch(database, "0", lines);
+  let running = true;
 
+  return {
+    baseURL: `http://127.0.0.1:${launched.port}`,
+    build: launchedCommit(),
+    log: () => lines.join("\n"),
+    stops: () => {
+      running = false;
+
+      return stop(launched.child);
+    },
+    startsAgain: async () => {
+      launched = await launch(database, launched.port, lines);
+      running = true;
+    },
+    isRunning: () => running,
+    stop: async () => {
+      await stop(launched.child);
+      rmSync(dir, { recursive: true, force: true });
+    },
+  };
+}
+
+/** Launches a server on the database and port, and resolves with the port once it logs that it is listening. */
+async function launch(
+  database: string,
+  port: string,
+  lines: string[],
+): Promise<{ readonly child: ChildProcess; readonly port: string }> {
   const child = spawn("mise", ["run", "--quiet", "launch"], {
     cwd: join(import.meta.dirname, "..", ".."),
     detached: true,
-    env: { ...process.env, PORT: "0", DATABASE_PATH: join(dir, "game.db"), NO_COLOR: "1" },
+    env: { ...process.env, PORT: port, DATABASE_PATH: database, NO_COLOR: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -38,7 +79,7 @@ export async function startServer(): Promise<ServerProcess> {
     lines.push(line);
   });
 
-  const port = await new Promise<string>((resolve, reject) => {
+  const listening = await new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
       reject(new Error(`the server did not log "listening on" within ${START_TIMEOUT_MS} ms:\n${lines.join("\n")}`));
     }, START_TIMEOUT_MS);
@@ -59,21 +100,16 @@ export async function startServer(): Promise<ServerProcess> {
     });
   });
 
-  return {
-    baseURL: `http://127.0.0.1:${port}`,
-    build: launchedCommit(),
-    log: () => lines.join("\n"),
-    stop: async () => {
-      await stop(child);
-      rmSync(dir, { recursive: true, force: true });
-    },
-  };
+  return { child, port: listening };
 }
 
-async function stop(child: ChildProcess): Promise<void> {
-  if (child.pid === undefined || child.exitCode !== null) {
-    return;
+async function stop(child: ChildProcess): Promise<Stopped> {
+  if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) {
+    return { milliseconds: 0, killed: false };
   }
+
+  const started = Date.now();
+  let killed = false;
 
   const exited = new Promise<void>((resolve) => {
     child.once("exit", () => {
@@ -86,10 +122,13 @@ async function stop(child: ChildProcess): Promise<void> {
 
   const timer = setTimeout(() => {
     if (child.pid !== undefined) {
+      killed = true;
       process.kill(-child.pid, "SIGKILL");
     }
   }, STOP_TIMEOUT_MS);
 
   await exited;
   clearTimeout(timer);
+
+  return { milliseconds: Date.now() - started, killed };
 }

@@ -58,6 +58,15 @@ impl Store for InMemory {
         std::future::ready(Ok(saved))
     }
 
+    fn open_guesses(&self) -> impl Future<Output = Result<Vec<OpenGuess>, StoreError>> + Send {
+        let open = self
+            .lock()
+            .values()
+            .filter_map(|standing| standing.open_guess)
+            .collect();
+        std::future::ready(Ok(open))
+    }
+
     fn standing(
         &self,
         player: PlayerId,

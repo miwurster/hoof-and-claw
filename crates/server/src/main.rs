@@ -12,6 +12,8 @@ use clap::Parser as _;
 use game::{Broadcast, Clock, Fanout, Game, Store};
 use prices::PriceSource;
 use tokio::net::TcpListener;
+use tokio::sync::oneshot;
+use tokio::time::Instant;
 
 use crate::configuration::Configuration;
 
@@ -30,12 +32,23 @@ async fn main() -> anyhow::Result<()> {
         let clock = test_controls::ControllableClock::new();
         let (source, controls) = test_controls::controllable_source();
         let game = Game::new(clock.clone(), Broadcast::new(), database.clone());
+        let close_source = {
+            let controls = controls.clone();
+            async move { controls.set_connected(false) }
+        };
         let test_controls = test_controls::routes(test_controls::Controls {
             clock,
             source: controls,
             game: game.clone(),
         });
-        serve(configuration, game, source, async {}, Some(test_controls)).await
+        serve(
+            configuration,
+            game,
+            source,
+            close_source,
+            Some(test_controls),
+        )
+        .await
     };
     #[cfg(not(feature = "test-controls"))]
     let result = {
@@ -57,10 +70,17 @@ async fn serve<C: Clock, F: Fanout, S: Store>(
     close_source: impl Future<Output = ()> + Send + 'static,
     test_controls: Option<axum::Router>,
 ) -> anyhow::Result<()> {
+    // A Guess placed before a restart resolves on the first changed price received after it.
+    let waiting = game
+        .rebuild_due_guesses()
+        .await
+        .context("reading the Open guesses")?;
+    tracing::info!("{waiting} open guesses wait for resolution");
     let running = tokio::spawn({
         let game = game.clone();
         async move { game.run(source).await }
     });
+    let drain = Duration::from_secs(configuration.shutdown_drain_secs);
     let router = web::router(web::Config {
         game: game.clone(),
         build: configuration.build,
@@ -83,22 +103,48 @@ async fn serve<C: Clock, F: Fanout, S: Store>(
         .with_context(|| format!("binding port {}", configuration.port))?;
     tracing::info!("listening on {}", listener.local_addr()?);
 
+    // The drain's deadline, set when the signal arrives.
+    let (deadline_sender, deadline) = oneshot::channel();
     // The peer address is the per-IP key when no proxy header names the client.
     let served = axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(async move {
-        shutdown_signal().await;
-        // Closing the connection to the Price source makes the price Price delayed (ADR 0007).
-        close_source.await;
-        // Graceful shutdown waits for every open stream, so the streams end first.
-        game.end_streams();
+    .with_graceful_shutdown({
+        let game = game.clone();
+        async move {
+            shutdown_signal().await;
+            let _ = deadline_sender.send(Instant::now() + drain);
+            // Closing the connection to the Price source makes the price Price delayed (ADR 0007); the game publishes
+            // that and refuses every Guess from now on with `priceDelayed`.
+            close_source.await;
+            game.shut_down();
+            // Graceful shutdown waits for every open stream, so the streams end first.
+            game.end_streams();
+        }
     })
-    .await
-    .context("serving");
-    running.abort();
-    served
+    .into_future();
+    let drained = async {
+        served.await.context("serving")?;
+        // The game stops taking prices once a running save of resolutions is done.
+        if let Err(error) = running.await {
+            tracing::error!("the game stopped with an error: {error}");
+        }
+        Ok(())
+    };
+    let timed_out = async {
+        match deadline.await {
+            Ok(deadline) => tokio::time::sleep_until(deadline).await,
+            Err(_) => std::future::pending().await,
+        }
+    };
+    tokio::select! {
+        served = drained => served,
+        () = timed_out => {
+            tracing::warn!("shutting down without waiting any longer, after {} s", drain.as_secs());
+            Ok(())
+        }
+    }
 }
 
 async fn shutdown_signal() {

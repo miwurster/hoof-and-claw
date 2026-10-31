@@ -53,6 +53,10 @@ pub trait Store: Clone + Send + Sync + 'static {
         resolved: &[ResolvedGuess],
     ) -> impl Future<Output = Result<Vec<Resolution>, StoreError>> + Send;
 
+    /// Every Open guess of every Player, in no particular order, so the index of due guesses can be rebuilt at
+    /// start-up.
+    fn open_guesses(&self) -> impl Future<Output = Result<Vec<OpenGuess>, StoreError>> + Send;
+
     /// Where the Player stands; a Player who was never stored stands at Score 0 with no Open guess.
     fn standing(
         &self,

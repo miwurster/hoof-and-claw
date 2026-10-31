@@ -30,7 +30,7 @@ A pure crate does no I/O, starts no async runtime and reads no clock.
 | `bitstamp`      | adapter      | `PriceSource` over Bitstamp's WebSocket feed and REST seed                                                                 | `prices`, `tokio`, `tokio-tungstenite`, `rustls`          |
 | `sqlite`        | adapter      | every core's store port on one database file and one write connection                                                      | the cores, `sqlx`                                         |
 | `web`           | adapter      | axum routes, the SSE stream, the identity cookie, static files, the wire types of the API contract                         | `game`, the cores, `axum`, `tower-http`, `serde`, `ts-rs` |
-| `server`        | binary       | configuration, wiring, start-up                                                                                            | every crate above                                         |
+| `server`        | binary       | configuration, wiring, start-up, shutdown                                                                                  | every crate above                                         |
 | `test-controls` | test adapter | the controllable `Clock` and `PriceSource`, the HTTP endpoints that drive them, and their wire types                       | `game`, `prices`, `axum`, `serde`, `ts-rs`                |
 
 The "May depend on" column is enforced by `crate_graph_follows_the_table` in `crates/server/tests/architecture.rs`, which reads `cargo metadata`.

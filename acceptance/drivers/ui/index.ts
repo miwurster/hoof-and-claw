@@ -1,10 +1,8 @@
 // The UI driver: a Player's page in Chromium, found by role and accessible name.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-
 import { expect } from "@playwright/test";
 import type { APIRequest, Browser, BrowserContext, Locator, Page, Route } from "@playwright/test";
 
+import { colour } from "./colours";
 import { WithoutTheApi } from "./without-the-api";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
@@ -24,22 +22,6 @@ type Connection = {
   readonly network: string;
 };
 
-/** The design tokens' stylesheet, the one place that names the page's colours. */
-const TOKENS = readFileSync(join(import.meta.dirname, "..", "..", "..", "spa", "src", "styles", "tokens.css"), "utf8");
-
-/** A colour token as `getComputedStyle` writes it, such as `rgb(212, 178, 106)`. */
-function colour(token: string): string {
-  const hex = new RegExp(`${token}:\\s*#([0-9a-f]{6});`, "iu").exec(TOKENS)?.[1];
-
-  if (hex === undefined) {
-    throw new Error(`the token stylesheet has no colour ${token}`);
-  }
-
-  const [red, green, blue] = [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
-
-  return `rgb(${String(red)}, ${String(green)}, ${String(blue)})`;
-}
-
 /** A dollar string such as "64,000.00" as the page shows it, or the dash for no price. */
 function shown(price: string | null): string {
   return price === null ? "—" : `$${price}`;
@@ -56,6 +38,8 @@ class UiPlayer extends WithoutTheApi {
   constructor(
     private readonly context: BrowserContext,
     private readonly page: Page,
+    /** A further tab shares the first tab's browser context, and leaves closing it to the first tab. */
+    private readonly furtherTab = false,
   ) {
     super();
     this.price = page.getByRole("region", { name: "BTC/USD price" });
@@ -66,6 +50,15 @@ class UiPlayer extends WithoutTheApi {
 
   private button(direction: "Up" | "Down"): Locator {
     return this.page.getByRole("button", { name: direction, exact: true });
+  }
+
+  /** Opens the game in a new page of the same browser, which shares the identity cookie. */
+  async opensAnotherTab(): Promise<UiPlayer> {
+    const tab = new UiPlayer(this.context, await this.context.newPage(), true);
+
+    await tab.opensTheGame();
+
+    return tab;
   }
 
   async opensThePage(): Promise<void> {
@@ -284,7 +277,7 @@ class UiPlayer extends WithoutTheApi {
   }
 
   async close(): Promise<void> {
-    await this.context.close();
+    await (this.furtherTab ? this.page.close() : this.context.close());
   }
 }
 

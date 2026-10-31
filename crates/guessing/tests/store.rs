@@ -72,3 +72,10 @@ fn the_last_resolved_guess_is_the_most_recent_one() {
 fn resolutions_saved_together_move_each_players_own_score() {
     block_on(suite::resolutions_saved_together_move_each_players_own_score(InMemory::new()));
 }
+
+#[test]
+fn the_open_guesses_are_every_players_open_guess_and_no_resolved_one() {
+    block_on(
+        suite::the_open_guesses_are_every_players_open_guess_and_no_resolved_one(InMemory::new()),
+    );
+}

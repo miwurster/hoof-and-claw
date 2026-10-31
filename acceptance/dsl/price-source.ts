@@ -16,6 +16,11 @@ export class PriceSource {
     await this.driver.sendsPrice(price);
   }
 
+  /** The server started again, with the Price source in its start state. */
+  startsOver(): void {
+    this.connected = false;
+  }
+
   async losesTheConnection(): Promise<void> {
     this.connected = false;
     await this.driver.setsConnected(false);

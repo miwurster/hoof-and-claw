@@ -3,14 +3,25 @@ import { expect } from "@playwright/test";
 import type { APIRequest, APIRequestContext, APIResponse, Browser } from "@playwright/test";
 import type { ErrorBody, ErrorCode, OpenGuess, PlaceGuess } from "contract";
 
-import { apply, cents, decode, FORWARDED_FOR, heldOpen, outcome, read, shownResult, wire } from "./stream";
+import {
+  apply,
+  cents,
+  decode,
+  follow,
+  forgedGuess,
+  FORWARDED_FOR,
+  heldOpen,
+  outcome,
+  shownResult,
+  wire,
+} from "./stream";
 import type { View } from "./stream";
+import { expectIdentityCookie, issued, setCookies } from "./identity";
 import { WithoutAPage } from "./without-a-page";
 
 export { apiServer } from "./server";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
-const IDENTITY = "__Host-player";
 
 type Connection = {
   readonly baseURL: string;
@@ -29,13 +40,27 @@ class ApiPlayer extends WithoutAPage {
   private identity: string | undefined;
   private refusal: ErrorCode | undefined;
   private turnedAway: { readonly status: number; readonly error: ErrorCode } | undefined;
+  private readonly tabs: ApiPlayer[] = [];
 
   constructor(
     private readonly baseURL: string,
     private readonly network: string,
     private readonly request: APIRequestContext,
+    /** A further tab shares the first tab's requests and identity, and leaves closing them to it. */
+    private readonly firstTab?: ApiPlayer,
   ) {
     super();
+    this.identity = firstTab?.identity;
+  }
+
+  /** Opens the game in a further tab with the same identity, which keeps a view of its own. */
+  async opensAnotherTab(): Promise<ApiPlayer> {
+    const tab = new ApiPlayer(this.baseURL, this.network, this.request, this);
+
+    this.tabs.push(tab);
+    await tab.opensTheGame();
+
+    return tab;
   }
 
   async opensAnUnknownPage(): Promise<void> {
@@ -44,7 +69,7 @@ class ApiPlayer extends WithoutAPage {
 
   async opensThePage(): Promise<void> {
     this.lastPage = await this.request.get("/", { headers: this.headers() });
-    this.keepIdentity(this.lastPage.headersArray().filter((header) => header.name.toLowerCase() === "set-cookie"));
+    this.identity = issued(setCookies(this.lastPage), this.identity);
 
     const response = await this.request.get("/api/snapshot", { headers: this.headers() });
 
@@ -63,8 +88,7 @@ class ApiPlayer extends WithoutAPage {
 
     expect(response.status, "the stream should open").toBe(200);
 
-    this.identity =
-      response.headers.getSetCookie().find((candidate) => candidate.startsWith(`${IDENTITY}=`)) ?? this.identity;
+    this.identity = issued(response.headers.getSetCookie(), this.identity);
 
     if (response.body !== null) {
       this.reading.push(this.follow(response.body));
@@ -89,16 +113,7 @@ class ApiPlayer extends WithoutAPage {
   }
 
   async guessesWithAPriceAndTimeOfTheirOwn(direction: "Up" | "Down"): Promise<void> {
-    const forged = {
-      direction: wire(direction),
-      price: 100,
-      startPrice: 100,
-      time: "2020-01-01T00:00:00Z",
-      placedAt: "2020-01-01T00:00:00Z",
-      remainingMs: 1,
-    };
-
-    await this.place(JSON.stringify(forged), "application/json");
+    await this.place(JSON.stringify(forgedGuess(direction)), "application/json");
   }
 
   async guessesADirectionThatIsNeitherUpNorDown(): Promise<void> {
@@ -202,12 +217,7 @@ class ApiPlayer extends WithoutAPage {
 
   async expectsAnIdentity(): Promise<void> {
     await this.streamOpened();
-    expect(this.identity, "the server should issue an identity cookie").toBeDefined();
-
-    const attributes = (this.identity ?? "").split(";").map((attribute) => attribute.trim());
-
-    expect(attributes).toEqual(expect.arrayContaining(["Path=/", "HttpOnly", "Secure", "SameSite=Lax"]));
-    expect(attributes.find((attribute) => attribute.startsWith("Max-Age="))).toBe("Max-Age=34560000");
+    expectIdentityCookie(this.identity);
   }
 
   expectsNoIdentity(): Promise<void> {
@@ -228,8 +238,11 @@ class ApiPlayer extends WithoutAPage {
 
   async close(): Promise<void> {
     this.streams.abort();
-    await Promise.all(this.reading);
-    await this.request.dispose();
+    await Promise.all([...this.reading, ...this.tabs.map((tab) => tab.close())]);
+
+    if (this.firstTab === undefined) {
+      await this.request.dispose();
+    }
   }
 
   /** The Player's network and, once issued, their identity cookie. */
@@ -237,11 +250,6 @@ class ApiPlayer extends WithoutAPage {
     const cookie = this.identity?.split(";")[0];
 
     return cookie === undefined ? { [FORWARDED_FOR]: this.network } : { [FORWARDED_FOR]: this.network, cookie };
-  }
-
-  private keepIdentity(headers: readonly { readonly value: string }[]): void {
-    this.identity =
-      headers.map((header) => header.value).find((value) => value.startsWith(`${IDENTITY}=`)) ?? this.identity;
   }
 
   /** Sends the command to place a Guess, as `fetch` does in the page; a `201` answer is the Open guess. */
@@ -252,8 +260,7 @@ class ApiPlayer extends WithoutAPage {
       body,
     });
 
-    this.identity =
-      response.headers.getSetCookie().find((candidate) => candidate.startsWith(`${IDENTITY}=`)) ?? this.identity;
+    this.identity = issued(response.headers.getSetCookie(), this.identity);
 
     if (response.status === 201) {
       this.refusal = undefined;
@@ -267,17 +274,15 @@ class ApiPlayer extends WithoutAPage {
     await expect.poll(() => this.snapshots, "the stream should open with a snapshot").toBeGreaterThan(0);
   }
 
+  /** Follows the stream, and once the server ends or loses it, opens a new one as the page does. */
   private async follow(body: ReadableStream<Uint8Array>): Promise<void> {
-    try {
-      await read(body, (event) => {
-        this.snapshots += event.type === "snapshot" ? 1 : 0;
-        apply(this.view, event);
-      });
-    } catch (error) {
-      if (!this.streams.signal.aborted) {
-        throw error;
-      }
-    }
+    const reopen = (signal: AbortSignal) =>
+      fetch(new URL("/api/events", this.baseURL), { headers: this.headers(), signal });
+
+    await follow(body, reopen, this.streams.signal, (event) => {
+      this.snapshots += event.type === "snapshot" ? 1 : 0;
+      apply(this.view, event);
+    });
   }
 }
 

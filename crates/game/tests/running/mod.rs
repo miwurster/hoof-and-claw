@@ -40,6 +40,8 @@ pub struct Running {
     pub game: Game<MovableClock, Recording, Stores>,
     pub clock: MovableClock,
     pub fanout: Recording,
+    /// The game's task that takes in the Price source's reports.
+    pub task: tokio::task::JoinHandle<()>,
     reports: mpsc::UnboundedSender<Report>,
 }
 
@@ -54,7 +56,7 @@ impl Running {
         let fanout = Recording::new();
         let game = Game::new(clock.clone(), fanout.clone(), stores.clone());
         let (reports, receiver) = mpsc::unbounded_channel();
-        tokio::spawn({
+        let task = tokio::spawn({
             let game = game.clone();
             async move { game.run(FakeSource(receiver)).await }
         });
@@ -62,13 +64,14 @@ impl Running {
             game,
             clock,
             fanout,
+            task,
             reports,
         }
     }
 
     pub async fn report(&self, report: Report) {
         assert!(
-            self.reports.send(report).is_ok(),
+            !self.task.is_finished() && self.reports.send(report).is_ok(),
             "the game should still take reports"
         );
         settle().await;
