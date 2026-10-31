@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO players (id, score, created_at) VALUES (?, 0, ?) ON CONFLICT (id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "82fc06f0a6bb920106d08ea04d94c7290aa6707e88628a97627c3586b41f9e42"
+}

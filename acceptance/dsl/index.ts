@@ -2,7 +2,8 @@
 import { test as base } from "@playwright/test";
 
 import { Clock } from "./clock";
-import type { ControlsDriver, Drivers } from "./drivers";
+import type { ControlsDriver, Drivers, PlayerDriver } from "./drivers";
+import { freshNetwork, Neighbours } from "./network";
 import { Player } from "./player";
 import { PriceSource } from "./price-source";
 import { Server } from "./server";
@@ -13,12 +14,16 @@ export { seconds } from "./clock";
 
 type Actors = {
   readonly alice: Player;
+  /** Players on Alice's network. */
+  readonly neighbours: Neighbours;
   readonly priceSource: PriceSource;
   readonly clock: Clock;
   readonly server: Server;
 };
 
 type Infrastructure = {
+  /** The address Alice and her neighbours come from. */
+  readonly network: string;
   readonly controls: ControlsDriver;
   readonly serverLog: void;
 };
@@ -54,17 +59,52 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     { scope: "worker" },
   ],
 
-  alice: async ({ drivers, serverProcess, browser, playwright }, use) => {
-    const driver = await drivers.player({ baseURL: serverProcess.baseURL, browser, request: playwright.request });
+  // oxlint-disable-next-line no-empty-pattern -- Playwright requires an object pattern for a fixture without dependencies.
+  network: async ({}, use) => {
+    await use(freshNetwork());
+  },
+
+  alice: async ({ drivers, serverProcess, browser, playwright, network }, use) => {
+    const driver = await drivers.player({
+      baseURL: serverProcess.baseURL,
+      browser,
+      request: playwright.request,
+      network,
+    });
 
     await use(new Player("Alice", driver));
     await driver.close();
   },
 
+  neighbours: async ({ drivers, serverProcess, browser, playwright, network }, use) => {
+    const joined: PlayerDriver[] = [];
+
+    await use(
+      new Neighbours(async (name) => {
+        const driver = await drivers.player({
+          baseURL: serverProcess.baseURL,
+          browser,
+          request: playwright.request,
+          network,
+        });
+
+        joined.push(driver);
+
+        return new Player(name, driver);
+      }),
+    );
+    await Promise.all(joined.map((driver) => driver.close()));
+  },
+
   // Every test starts with the Price source in its start state: Price delayed and no price (ADR 0011).
   controls: [
     async ({ drivers, serverProcess, browser, playwright }, use) => {
-      const driver = await drivers.controls({ baseURL: serverProcess.baseURL, browser, request: playwright.request });
+      const driver = await drivers.controls({
+        baseURL: serverProcess.baseURL,
+        browser,
+        request: playwright.request,
+        network: freshNetwork(),
+      });
 
       await driver.resetsPriceSource();
       await use(driver);
@@ -82,7 +122,12 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
   },
 
   server: async ({ drivers, serverProcess, browser, playwright }, use) => {
-    const driver = await drivers.server({ baseURL: serverProcess.baseURL, browser, request: playwright.request });
+    const driver = await drivers.server({
+      baseURL: serverProcess.baseURL,
+      browser,
+      request: playwright.request,
+      network: freshNetwork(),
+    });
 
     await use(new Server(driver, serverProcess.build));
     await driver.close();

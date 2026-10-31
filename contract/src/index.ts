@@ -2,9 +2,11 @@
 export type * from "./Direction";
 export type * from "./ErrorBody";
 export type * from "./ErrorCode";
+export type * from "./GuessPlaced";
 export type * from "./Health";
 export type * from "./OpenGuess";
 export type * from "./Outcome";
+export type * from "./PlaceGuess";
 export type * from "./PriceChanged";
 export type * from "./ResolvedGuess";
 export type * from "./ServerEvent";

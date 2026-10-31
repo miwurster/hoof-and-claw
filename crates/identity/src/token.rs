@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use sha2::{Digest as _, Sha256};
 
 /// The opaque token in a browser's identity cookie: 32 random bytes, written in base64url.
 #[derive(Clone, PartialEq, Eq)]
@@ -14,11 +15,34 @@ pub enum TokenError {
     Malformed,
 }
 
+/// The SHA-256 hash of a token, the only form in which the server stores it; a slow hash adds nothing for 256 random
+/// bits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TokenHash([u8; 32]);
+
 impl Token {
     /// Issues a token from 32 bytes the caller drew from a secure random source.
     #[must_use]
     pub const fn from_random_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
+    }
+
+    #[must_use]
+    pub fn hash(&self) -> TokenHash {
+        TokenHash(Sha256::digest(self.0).into())
+    }
+}
+
+impl TokenHash {
+    /// A hash as the store reads it back.
+    #[must_use]
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
     }
 }
 
@@ -68,6 +92,20 @@ mod tests {
                 .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
             "{text}"
         );
+    }
+
+    #[test]
+    fn a_token_is_stored_as_its_sha_256_hash() {
+        let token = Token::from_random_bytes([0; 32]);
+
+        // SHA-256 of 32 zero bytes.
+        assert_eq!(
+            token.hash().as_bytes()[..4],
+            [0x66, 0x68, 0x7a, 0xad],
+            "{:x?}",
+            token.hash()
+        );
+        assert_ne!(token.hash(), Token::from_random_bytes([1; 32]).hash());
     }
 
     #[test]

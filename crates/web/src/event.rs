@@ -1,6 +1,6 @@
 //! The events of the stream and the snapshot it opens with (ADR 0014).
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 /// Every event on the stream, told apart by `type`.
@@ -10,6 +10,7 @@ use ts_rs::TS;
 pub enum ServerEvent {
     Snapshot(Snapshot),
     Price(PriceChanged),
+    GuessPlaced(GuessPlaced),
 }
 
 /// Everything a tab shows, sent first on every stream and answered by `GET /api/snapshot`.
@@ -41,6 +42,14 @@ pub struct PriceChanged {
     pub delayed: bool,
 }
 
+/// The Player placed a Guess, in this tab or another.
+#[derive(Clone, Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GuessPlaced {
+    pub guess: OpenGuess,
+}
+
 /// A Player's Open guess.
 #[derive(Clone, Debug, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -69,7 +78,7 @@ pub struct ResolvedGuess {
     pub outcome: Outcome,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, TS)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum Direction {
@@ -90,6 +99,55 @@ impl From<prices::LatestPrice> for PriceChanged {
         Self {
             price: latest.price().map(prices::Price::cents),
             delayed: latest.is_delayed(),
+        }
+    }
+}
+
+impl From<guessing::Direction> for Direction {
+    fn from(direction: guessing::Direction) -> Self {
+        match direction {
+            guessing::Direction::Up => Self::Up,
+            guessing::Direction::Down => Self::Down,
+        }
+    }
+}
+
+impl From<Direction> for guessing::Direction {
+    fn from(direction: Direction) -> Self {
+        match direction {
+            Direction::Up => Self::Up,
+            Direction::Down => Self::Down,
+        }
+    }
+}
+
+impl From<game::Open> for OpenGuess {
+    fn from(open: game::Open) -> Self {
+        Self {
+            id: open.guess.id.to_string(),
+            direction: open.guess.direction.into(),
+            start_price: open.guess.start.price.cents(),
+            // Never more than 60 000.
+            remaining_ms: u64::try_from(open.remaining.as_millis()).unwrap_or(u64::MAX),
+        }
+    }
+}
+
+impl From<game::PlayerEvent> for ServerEvent {
+    fn from(event: game::PlayerEvent) -> Self {
+        match event {
+            game::PlayerEvent::GuessPlaced(open) => {
+                Self::GuessPlaced(GuessPlaced { guess: open.into() })
+            }
+        }
+    }
+}
+
+impl From<game::Event> for ServerEvent {
+    fn from(event: game::Event) -> Self {
+        match event {
+            game::Event::Price(latest) => Self::Price(latest.into()),
+            game::Event::Player(event) => event.into(),
         }
     }
 }

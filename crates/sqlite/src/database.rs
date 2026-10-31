@@ -3,8 +3,9 @@ use std::path::Path;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions};
 
 /// The game's database file, migrated, behind exactly one write connection.
+#[derive(Clone)]
 pub struct Database {
-    pool: SqlitePool,
+    pub(crate) pool: SqlitePool,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -36,8 +37,8 @@ impl Database {
         Ok(Self { pool })
     }
 
-    /// Waits for the running statement and closes the connection.
-    pub async fn close(self) {
+    /// Waits for the running statement and closes the connection, for every clone.
+    pub async fn close(&self) {
         self.pool.close().await;
     }
 }

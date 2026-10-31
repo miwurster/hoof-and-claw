@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT player_id FROM identity_links WHERE token_hash = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "player_id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "identity_links",
+            "name": "player_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5de37b8bfc1dd5e5da6a261e0a793dc8c4a635d20dece2b9ab192337e55335b7"
+}

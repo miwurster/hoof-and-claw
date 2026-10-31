@@ -1,95 +1,24 @@
 // The API driver: the game's HTTP API and its stream, as the SPA uses them.
 import { expect } from "@playwright/test";
 import type { APIRequest, APIRequestContext, APIResponse, Browser } from "@playwright/test";
-import type { ErrorBody, Health, OpenGuess, ServerEvent } from "contract";
+import type { ErrorBody, ErrorCode, OpenGuess, PlaceGuess } from "contract";
+
+import { apply, cents, decode, FORWARDED_FOR, heldOpen, read, wire } from "./stream";
+import type { View } from "./stream";
+
+export { apiServer } from "./server";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
-const MISSING_GAME_ROUTE = "/api/a-route-that-does-not-exist";
-const MISSING_TEST_CONTROL = "/test-controls/a-control-that-does-not-exist";
 const IDENTITY = "__Host-player";
 
 type Connection = {
   readonly baseURL: string;
   readonly browser: Browser;
   readonly request: APIRequest;
+  readonly network: string;
 };
 
-/** What the Player's stream has shown so far. */
-type View = {
-  price: number | null;
-  delayed: boolean;
-  score: number;
-  openGuess: OpenGuess | null;
-};
-
-/** Decodes a body as the contract's type; the one place this driver trusts the server's JSON. */
-async function decode<Body>(response: APIResponse): Promise<Body> {
-  // SAFETY: the server and this driver are built from the same commit, so the body is the contract's type (ADR 0014).
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Playwright types every JSON body as any.
-  return (await response.json()) as Body;
-}
-
-/** Decodes one event of the stream. */
-function decodeEvent(data: string): ServerEvent {
-  // SAFETY: the server and this driver are built from the same commit, so the event is the contract's type (ADR 0014).
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSON.parse returns any.
-  return JSON.parse(data) as ServerEvent;
-}
-
-/** A dollar string such as "64,000.00" in cents. */
-function cents(price: string): number {
-  const match = /^(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})$/u.exec(price);
-
-  if (match?.[1] === undefined || match[2] === undefined) {
-    throw new Error(`"${price}" is no price in dollars with cents, such as "64,000.00"`);
-  }
-
-  return Number(match[1].replaceAll(",", "")) * 100 + Number(match[2]);
-}
-
-function apply(view: View, event: ServerEvent): void {
-  view.price = event.price;
-  view.delayed = event.delayed;
-
-  if (event.type === "snapshot") {
-    view.score = event.score;
-    view.openGuess = event.openGuess;
-  }
-}
-
-/** Reads the stream's events, one `data:` line per event, until it ends or is aborted. */
-async function read(body: ReadableStream<Uint8Array>, onEvent: (event: ServerEvent) => void): Promise<void> {
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  for await (const chunk of body) {
-    buffer += decoder.decode(chunk, { stream: true });
-
-    let end = buffer.indexOf("\n\n");
-
-    while (end !== -1) {
-      const lines = buffer.slice(0, end).split("\n");
-
-      buffer = buffer.slice(end + 2);
-
-      for (const line of lines) {
-        if (line.startsWith("data:")) {
-          onEvent(decodeEvent(line.slice("data:".length).trim()));
-        }
-      }
-
-      end = buffer.indexOf("\n\n");
-    }
-  }
-}
-
-async function missing(response: APIResponse) {
-  const body = await decode<ErrorBody>(response);
-
-  return { status: response.status(), error: body.error };
-}
-
-/** A Player's HTTP client with its own identity cookie and streams. */
+/** A Player's HTTP client with its own identity cookie and streams, from its own network. */
 class ApiPlayer {
   private readonly view: View = { price: null, delayed: true, score: 0, openGuess: null };
   private readonly streams = new AbortController();
@@ -97,9 +26,12 @@ class ApiPlayer {
   private snapshots = 0;
   private lastPage: APIResponse | undefined;
   private identity: string | undefined;
+  private refusal: ErrorCode | undefined;
+  private turnedAway: { readonly status: number; readonly error: ErrorCode } | undefined;
 
   constructor(
     private readonly baseURL: string,
+    private readonly network: string,
     private readonly request: APIRequestContext,
   ) {}
 
@@ -107,10 +39,24 @@ class ApiPlayer {
     this.lastPage = await this.request.get(UNKNOWN_PAGE);
   }
 
+  async opensThePage(): Promise<void> {
+    this.lastPage = await this.request.get("/", { headers: this.headers() });
+    this.keepIdentity(this.lastPage.headersArray().filter((header) => header.name.toLowerCase() === "set-cookie"));
+
+    const response = await this.request.get("/api/snapshot", { headers: this.headers() });
+
+    if (response.status() !== 200) {
+      this.turnedAway = { status: response.status(), error: (await decode<ErrorBody>(response)).error };
+    }
+  }
+
   async opensTheGame(): Promise<void> {
-    const cookie = this.identity?.split(";")[0];
-    const headers: Record<string, string> = cookie === undefined ? {} : { cookie };
-    const response = await fetch(new URL("/api/events", this.baseURL), { headers, signal: this.streams.signal });
+    const opened = this.snapshots;
+
+    const response = await fetch(new URL("/api/events", this.baseURL), {
+      headers: this.headers(),
+      signal: this.streams.signal,
+    });
 
     expect(response.status, "the stream should open").toBe(200);
 
@@ -121,7 +67,56 @@ class ApiPlayer {
       this.reading.push(this.follow(response.body));
     }
 
-    await this.streamOpened();
+    await expect.poll(() => this.snapshots, "the stream should open with a snapshot").toBeGreaterThan(opened);
+  }
+
+  async guesses(direction: "Up" | "Down"): Promise<void> {
+    const command: PlaceGuess = { direction: wire(direction) };
+
+    await this.place(JSON.stringify(command), "application/json");
+  }
+
+  startsToGuess(): Promise<void> {
+    return Promise.reject(new Error("the API has no buttons to disable while a Guess is being placed"));
+  }
+
+  receivesTheAnswer(): Promise<void> {
+    return Promise.reject(new Error("the API has no buttons to disable while a Guess is being placed"));
+  }
+
+  async guessesWithAPriceAndTimeOfTheirOwn(direction: "Up" | "Down"): Promise<void> {
+    const forged = {
+      direction: wire(direction),
+      price: 100,
+      startPrice: 100,
+      time: "2020-01-01T00:00:00Z",
+      placedAt: "2020-01-01T00:00:00Z",
+      remainingMs: 1,
+    };
+
+    await this.place(JSON.stringify(forged), "application/json");
+  }
+
+  async guessesADirectionThatIsNeitherUpNorDown(): Promise<void> {
+    await this.place(JSON.stringify({ direction: "sideways" }), "application/json");
+  }
+
+  async guessesWithABodyThatIsNotJson(): Promise<void> {
+    await this.place("direction=up", "application/json");
+  }
+
+  async guessesWithoutSayingTheBodyIsJson(): Promise<void> {
+    const command: PlaceGuess = { direction: "up" };
+
+    await this.place(JSON.stringify(command), "text/plain");
+  }
+
+  movesTheFocusTo(): Promise<void> {
+    return Promise.reject(new Error("the API has no keyboard focus"));
+  }
+
+  pressesEnter(): Promise<void> {
+    return Promise.reject(new Error("the API has no keyboard"));
   }
 
   async expectsTheGame(): Promise<void> {
@@ -146,18 +141,7 @@ class ApiPlayer {
   async holdsTheStream(milliseconds: number): Promise<number> {
     await this.streamOpened();
 
-    const opened = Date.now();
-    const ended = this.reading.at(-1) ?? Promise.resolve();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const held = new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, milliseconds);
-    });
-
-    await Promise.race([ended, held]);
-    clearTimeout(timer);
-
-    return Date.now() - opened;
+    return heldOpen(this.reading.at(-1) ?? Promise.resolve(), milliseconds);
   }
 
   async expectsScore(score: number): Promise<void> {
@@ -170,9 +154,47 @@ class ApiPlayer {
     expect(this.view.openGuess).toBeNull();
   }
 
-  /** The API has no buttons; a Guess can be placed while the stream shows a live price. */
+  async expectsOpenGuess(direction: "Up" | "Down", startPrice: string): Promise<void> {
+    await expect
+      .poll(
+        () =>
+          this.view.openGuess && { direction: this.view.openGuess.direction, start: this.view.openGuess.startPrice },
+      )
+      .toEqual({ direction: wire(direction), start: cents(startPrice) });
+  }
+
+  /** The server's clock stands still, so the time left is exactly what the server says. */
+  async expectsSecondsLeft(seconds: number): Promise<void> {
+    await expect.poll(() => this.view.openGuess?.remainingMs).toBe(seconds * 1000);
+  }
+
+  expectsDifference(): Promise<void> {
+    return Promise.reject(new Error("the API carries no difference from the Start price; only the page shows it"));
+  }
+
+  expectsWaitingForThePriceToMove(): Promise<void> {
+    return Promise.reject(new Error("the API has no waiting label; only the page shows it"));
+  }
+
+  /** The API has no buttons; a Guess can be placed while the stream shows a live price and no Open guess. */
   async expectsGuessing(possible: boolean): Promise<void> {
-    await expect.poll(() => !this.view.delayed && this.view.price !== null).toBe(possible);
+    await expect
+      .poll(() => !this.view.delayed && this.view.price !== null && this.view.openGuess === null)
+      .toBe(possible);
+  }
+
+  async expectsNoSecondGuess(): Promise<void> {
+    const open = this.view.openGuess;
+
+    await this.guesses("Down");
+    expect(this.refusal, "a second Guess should be refused").toBe("openGuessExists");
+    expect(this.view.openGuess, "the first Guess should stay open").toEqual(open);
+  }
+
+  expectsRefusal(refusal: ErrorCode): Promise<void> {
+    expect(this.refusal, `the Guess should be refused as ${refusal}`).toBe(refusal);
+
+    return Promise.resolve();
   }
 
   async expectsAnIdentity(): Promise<void> {
@@ -185,18 +207,66 @@ class ApiPlayer {
     expect(attributes.find((attribute) => attribute.startsWith("Max-Age="))).toBe("Max-Age=34560000");
   }
 
-  expectsAnnouncement(): Promise<void> {
-    return Promise.reject(new Error("the API has no screen reader"));
+  expectsNoIdentity(): Promise<void> {
+    expect(this.lastPage?.status(), "the page should load").toBe(200);
+    expect(this.identity, "the server should issue no identity cookie").toBeUndefined();
+
+    return Promise.resolve();
   }
 
-  expectsWhereTheScoreLives(): Promise<void> {
-    return Promise.reject(new Error("the API has no page"));
+  expectsTurnedAway(refusal: ErrorCode): Promise<void> {
+    expect(this.turnedAway, `the game should turn the visitor away as ${refusal}`).toEqual({
+      status: 429,
+      error: refusal,
+    });
+
+    return Promise.resolve();
   }
+
+  expectsAnnouncement = (): Promise<void> => Promise.reject(new Error("the API has no screen reader"));
+
+  expectsWhereTheScoreLives = (): Promise<void> => Promise.reject(new Error("the API has no page"));
+
+  expectsEverythingByRoleAndName = (): Promise<void> =>
+    Promise.reject(new Error("the API has no roles or accessible names"));
+
+  expectsHornFocusRing = (): Promise<void> => Promise.reject(new Error("the API has no focus ring"));
 
   async close(): Promise<void> {
     this.streams.abort();
     await Promise.all(this.reading);
     await this.request.dispose();
+  }
+
+  /** The Player's network and, once issued, their identity cookie. */
+  private headers(): Record<string, string> {
+    const cookie = this.identity?.split(";")[0];
+
+    return cookie === undefined ? { [FORWARDED_FOR]: this.network } : { [FORWARDED_FOR]: this.network, cookie };
+  }
+
+  private keepIdentity(headers: readonly { readonly value: string }[]): void {
+    this.identity =
+      headers.map((header) => header.value).find((value) => value.startsWith(`${IDENTITY}=`)) ?? this.identity;
+  }
+
+  /** Sends the command to place a Guess, as `fetch` does in the page; a `201` answer is the Open guess. */
+  private async place(body: string, contentType: string): Promise<void> {
+    const response = await fetch(new URL("/api/guesses", this.baseURL), {
+      method: "POST",
+      headers: { ...this.headers(), "Content-Type": contentType },
+      body,
+    });
+
+    this.identity =
+      response.headers.getSetCookie().find((candidate) => candidate.startsWith(`${IDENTITY}=`)) ?? this.identity;
+
+    if (response.status === 201) {
+      this.refusal = undefined;
+      this.view.openGuess = await decode<OpenGuess>(response);
+    } else {
+      this.refusal = (await decode<ErrorBody>(response)).error;
+    }
   }
 
   private async streamOpened(): Promise<void> {
@@ -218,39 +288,12 @@ class ApiPlayer {
 }
 
 export async function apiPlayer(connection: Connection) {
-  return new ApiPlayer(connection.baseURL, await connection.request.newContext({ baseURL: connection.baseURL }));
-}
-
-export async function apiServer(connection: Connection) {
-  const request = await connection.request.newContext({ baseURL: connection.baseURL });
-
-  return {
-    health: async () => {
-      const response = await request.get("/health");
-
-      expect(response.status(), "the health check should answer 200").toBe(200);
-
-      const health = await decode<Health>(response);
-
-      return { build: health.build, testControls: health.testControls };
-    },
-    missingGameRoute: async () => missing(await request.get(MISSING_GAME_ROUTE)),
-    missingTestControl: async () => missing(await request.get(MISSING_TEST_CONTROL)),
-    time: async () => {
-      const response = await request.get("/api/snapshot");
-
-      expect(response.status(), "the snapshot should answer 200").toBe(200);
-
-      const snapshot = await decode<ServerEvent>(response);
-
-      if (snapshot.type !== "snapshot") {
-        throw new Error(`the snapshot route answered a ${snapshot.type} event`);
-      }
-
-      return snapshot.serverTime;
-    },
-    close: async () => {
-      await request.dispose();
-    },
-  };
+  return new ApiPlayer(
+    connection.baseURL,
+    connection.network,
+    await connection.request.newContext({
+      baseURL: connection.baseURL,
+      extraHTTPHeaders: { [FORWARDED_FOR]: connection.network },
+    }),
+  );
 }

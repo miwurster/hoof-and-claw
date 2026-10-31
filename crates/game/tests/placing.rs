@@ -1,0 +1,291 @@
+//! Placing a Guess, with a fake Price source, a clock the test moves, the in-memory stores and the recording `Fanout`.
+
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
+
+use game::{Clock, Event, Game, PlaceError, PlayerEvent, Recording};
+use guessing::{Direction, Refusal, Score};
+use identity::Token;
+use jiff::{SignedDuration, Timestamp};
+use prices::{Price, PriceSource, ReceivedPrice, Report, Source};
+use support::Stores;
+use tokio::sync::mpsc;
+
+mod support;
+
+/// 2026-10-31T12:00:00Z.
+const NOW: Timestamp = Timestamp::constant(1_793_448_000, 0);
+
+#[derive(Clone)]
+struct MovableClock(Arc<Mutex<Timestamp>>);
+
+impl MovableClock {
+    fn advance(&self, duration: SignedDuration) {
+        let mut now = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        *now = now.saturating_add(duration).unwrap_or(Timestamp::MAX);
+    }
+}
+
+impl Clock for MovableClock {
+    fn now(&self) -> Timestamp {
+        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+struct FakeSource(mpsc::UnboundedReceiver<Report>);
+
+impl PriceSource for FakeSource {
+    async fn next(&mut self) -> Option<Report> {
+        self.0.recv().await
+    }
+}
+
+struct Running {
+    game: Game<MovableClock, Recording, Stores>,
+    clock: MovableClock,
+    fanout: Recording,
+    reports: mpsc::UnboundedSender<Report>,
+}
+
+impl Running {
+    fn start() -> Self {
+        let clock = MovableClock(Arc::new(Mutex::new(NOW)));
+        let fanout = Recording::new();
+        let game = Game::new(clock.clone(), fanout.clone(), Stores::default());
+        let (reports, receiver) = mpsc::unbounded_channel();
+        tokio::spawn({
+            let game = game.clone();
+            async move { game.run(FakeSource(receiver)).await }
+        });
+        Self {
+            game,
+            clock,
+            fanout,
+            reports,
+        }
+    }
+
+    async fn report(&self, report: Report) {
+        assert!(
+            self.reports.send(report).is_ok(),
+            "the game should still take reports"
+        );
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    async fn live_at(&self, cents: u64) {
+        self.report(Report::Live).await;
+        self.report(Report::Received(Price::from_cents(cents)))
+            .await;
+    }
+}
+
+fn alice() -> Token {
+    Token::from_random_bytes([1; 32])
+}
+
+fn bob() -> Token {
+    Token::from_random_bytes([2; 32])
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_guess_starts_from_the_last_price_received_with_60_seconds_left() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+
+    let open = running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+
+    assert_eq!(open.guess.direction, Direction::Up);
+    assert_eq!(
+        open.guess.start,
+        ReceivedPrice {
+            price: Price::from_cents(6_400_000),
+            source: Source::Bitstamp,
+            received_at: NOW,
+        }
+    );
+    assert_eq!(open.guess.placed_at, NOW);
+    assert_eq!(open.remaining, Duration::from_secs(60));
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_start_price_is_the_last_price_received_even_before_the_streams_were_sent_it() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+    running.clock.advance(SignedDuration::from_millis(300));
+
+    // Within the same second, so the throttle holds it back from the streams.
+    running
+        .report(Report::Received(Price::from_cents(6_400_050)))
+        .await;
+    let open = running
+        .game
+        .place_guess(&alice(), Direction::Down)
+        .await
+        .unwrap();
+
+    assert_eq!(open.guess.start.price, Price::from_cents(6_400_050));
+    assert_eq!(
+        open.guess.start.received_at,
+        NOW.checked_add(SignedDuration::from_millis(300)).unwrap()
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn while_the_price_is_delayed_a_guess_is_refused_and_nothing_is_stored() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+    running.report(Report::Delayed).await;
+
+    let refused = running.game.place_guess(&alice(), Direction::Up).await;
+
+    assert!(
+        matches!(refused, Err(PlaceError::Refused(Refusal::PriceDelayed))),
+        "{refused:?}"
+    );
+    assert_eq!(running.game.player(&alice()).await.unwrap(), None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn before_any_price_a_guess_is_refused() {
+    let running = Running::start();
+    running.report(Report::Live).await;
+
+    let refused = running.game.place_guess(&alice(), Direction::Up).await;
+
+    assert!(
+        matches!(refused, Err(PlaceError::Refused(Refusal::PriceDelayed))),
+        "{refused:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_player_with_an_open_guess_cannot_place_another() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+    let first = running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+
+    let second = running.game.place_guess(&alice(), Direction::Down).await;
+
+    assert!(
+        matches!(second, Err(PlaceError::Refused(Refusal::OpenGuessExists))),
+        "{second:?}"
+    );
+    let player = running.game.player(&alice()).await.unwrap();
+    let snapshot = running.game.snapshot(player).await.unwrap();
+    assert_eq!(
+        snapshot.open_guess.map(|open| open.guess),
+        Some(first.guess)
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_visitor_reads_as_score_0_with_no_open_guess_and_is_stored_by_nothing() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+
+    let player = running.game.player(&alice()).await.unwrap();
+    let snapshot = running.game.snapshot(player).await.unwrap();
+
+    assert_eq!(player, None);
+    assert_eq!(snapshot.score, Score::new(0));
+    assert_eq!(snapshot.open_guess, None);
+    assert_eq!(running.game.player(&alice()).await.unwrap(), None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_snapshot_counts_the_open_guess_down_with_the_servers_clock() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+    let placed = running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+
+    running.clock.advance(SignedDuration::from_secs(20));
+    let player = running.game.player(&alice()).await.unwrap();
+    let snapshot = running.game.snapshot(player).await.unwrap();
+
+    let open = snapshot.open_guess.unwrap();
+    assert_eq!(open.guess, placed.guess);
+    assert_eq!(open.remaining, Duration::from_secs(40));
+    assert_eq!(snapshot.score, Score::new(0));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_placed_guess_is_published_as_guess_placed_to_its_player_and_a_refused_one_is_not() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+
+    let bobs = running
+        .game
+        .place_guess(&bob(), Direction::Down)
+        .await
+        .unwrap();
+    let alices = running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+    let refused = running.game.place_guess(&alice(), Direction::Down).await;
+
+    assert!(refused.is_err());
+    let bob_id = running.game.player(&bob()).await.unwrap().unwrap();
+    let alice_id = running.game.player(&alice()).await.unwrap().unwrap();
+    assert_eq!(
+        running.fanout.notified(),
+        [
+            (bob_id, PlayerEvent::GuessPlaced(bobs)),
+            (alice_id, PlayerEvent::GuessPlaced(alices)),
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn the_same_browser_stays_the_same_player() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+
+    running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+    let first = running.game.player(&alice()).await.unwrap();
+    let again = running.game.player(&alice()).await.unwrap();
+
+    assert!(first.is_some());
+    assert_eq!(first, again);
+    assert_ne!(first, running.game.player(&bob()).await.unwrap());
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_price_still_reaches_a_players_stream() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+    running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+    let alice_id = running.game.player(&alice()).await.unwrap();
+    let mut stream = running.game.subscribe(alice_id);
+
+    running.report(Report::Delayed).await;
+
+    match stream.next().await {
+        Some(Event::Price(latest)) => assert!(latest.is_delayed()),
+        other => panic!("expected a price, got {other:?}"),
+    }
+}

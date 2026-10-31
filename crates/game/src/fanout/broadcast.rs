@@ -1,14 +1,24 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError};
 
+use guessing::PlayerId;
 use prices::LatestPrice;
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 
-use super::{Delivery, Fanout, Subscription};
+use super::{Delivery, Fanout, PLAYER_EVENT_QUEUE, PlayerEvent, Subscription};
 
-/// The in-process `Fanout`: one `watch` slot for the price that every stream reads.
+/// The in-process `Fanout`: one `watch` slot for the price that every stream reads, and a bounded queue per stream for
+/// its Player's events, held in a registry keyed by Player ID.
 #[derive(Clone)]
 pub struct Broadcast {
     price: Arc<watch::Sender<Delivery>>,
+    players: Arc<Mutex<Registry>>,
+}
+
+#[derive(Default)]
+struct Registry {
+    closed: bool,
+    streams: HashMap<PlayerId, Vec<mpsc::Sender<PlayerEvent>>>,
 }
 
 impl Broadcast {
@@ -17,7 +27,12 @@ impl Broadcast {
         let (price, _) = watch::channel(Delivery::Price(LatestPrice::default()));
         Self {
             price: Arc::new(price),
+            players: Arc::default(),
         }
+    }
+
+    fn registry(&self) -> std::sync::MutexGuard<'_, Registry> {
+        self.players.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
@@ -38,11 +53,35 @@ impl Fanout for Broadcast {
         });
     }
 
-    fn subscribe(&self) -> Subscription {
-        Subscription::new(self.price.subscribe())
+    fn notify_player(&self, player: PlayerId, event: PlayerEvent) {
+        let mut registry = self.registry();
+        let Some(streams) = registry.streams.get_mut(&player) else {
+            return;
+        };
+        // Dropping the sender of a full or abandoned stream closes it once it has read what it holds.
+        streams.retain(|stream| stream.try_send(event).is_ok());
+        if streams.is_empty() {
+            registry.streams.remove(&player);
+        }
+    }
+
+    fn subscribe(&self, player: Option<PlayerId>) -> Subscription {
+        let price = self.price.subscribe();
+        let Some(player) = player else {
+            return Subscription::new(price, None);
+        };
+        let (sender, receiver) = mpsc::channel(PLAYER_EVENT_QUEUE);
+        let mut registry = self.registry();
+        if !registry.closed {
+            registry.streams.entry(player).or_default().push(sender);
+        }
+        Subscription::new(price, Some(receiver))
     }
 
     fn close(&self) {
+        let mut registry = self.registry();
+        registry.closed = true;
+        registry.streams.clear();
         self.price.send_replace(Delivery::Closed);
     }
 }

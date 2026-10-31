@@ -7,6 +7,7 @@ type Connection = {
   readonly baseURL: string;
   readonly browser: Browser;
   readonly request: APIRequest;
+  readonly network: string;
 };
 
 /** A dollar string such as "64,000.00" in cents. */

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO identity_links (token_hash, player_id) VALUES (?, ?) ON CONFLICT (token_hash) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "f74c98dbb0f93f03441f362da87c60d7b3280f525935ddc1be7270ac6da3eb75"
+}

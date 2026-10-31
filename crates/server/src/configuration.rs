@@ -1,7 +1,10 @@
 //! The server's configuration, read once from environment variables at start-up.
 
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::path::PathBuf;
 use std::time::Duration;
+
+use axum::http::HeaderName;
 
 /// Environment variables without a prefix; the server refuses to start on an invalid value.
 #[derive(Debug, clap::Parser)]
@@ -50,6 +53,30 @@ pub(crate) struct Configuration {
     /// The longest wait before reconnecting, in seconds.
     #[arg(long, env = "PRICE_BACKOFF_MAX_SECS", default_value_t = 30)]
     pub(crate) price_backoff_max_secs: u64,
+
+    /// Placing a Guess: how many a minute per IP.
+    #[arg(long, env = "GUESS_RATE_PER_MINUTE", default_value = "10")]
+    pub(crate) guess_rate_per_minute: NonZeroU32,
+
+    /// Placing a Guess: how many at once per IP before the rate applies.
+    #[arg(long, env = "GUESS_RATE_BURST", default_value = "10")]
+    pub(crate) guess_rate_burst: NonZeroU32,
+
+    /// New identity cookies: how many an hour per IP.
+    #[arg(long, env = "COOKIE_RATE_PER_HOUR", default_value = "30")]
+    pub(crate) cookie_rate_per_hour: NonZeroU32,
+
+    /// New identity cookies: how many at once per IP before the rate applies.
+    #[arg(long, env = "COOKIE_RATE_BURST", default_value = "30")]
+    pub(crate) cookie_rate_burst: NonZeroU32,
+
+    /// The header the proxy appends the client's address to; the per-IP limits count by one of its entries.
+    #[arg(long, env = "CLIENT_IP_HEADER", default_value = "x-forwarded-for")]
+    pub(crate) client_ip_header: HeaderName,
+
+    /// Which entry of `CLIENT_IP_HEADER` is the client's address, counted from the right: 1 is the rightmost.
+    #[arg(long, env = "CLIENT_IP_FROM_RIGHT", default_value = "1")]
+    pub(crate) client_ip_from_right: NonZeroUsize,
 
     /// The directory holding the built app.
     #[arg(long, env = "APP_DIR", default_value = "spa/dist")]

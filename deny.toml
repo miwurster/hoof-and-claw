@@ -32,6 +32,9 @@ skip = [
   { crate = "windows-sys@0.52", reason = "ring, rustls' crypto provider, still uses windows-sys 0.52" },
   { crate = "getrandom@0.3", reason = "tungstenite's rand 0.9 lags behind; tungstenite 0.29+ would duplicate sha1's digest with sqlx instead" },
   { crate = "r-efi@5", reason = "tungstenite's rand 0.9 pulls getrandom 0.3, which uses r-efi 5" },
+  { crate = "hashbrown@0.14", reason = "governor's dashmap, behind tower_governor (spec #26, abuse protection)" },
+  { crate = "thiserror@1", reason = "tower_governor's forwarded-header-value is on thiserror 1" },
+  { crate = "thiserror-impl@1", reason = "tower_governor's forwarded-header-value is on thiserror 1" },
 ]
 
 [[bans.deny]]
@@ -47,7 +50,7 @@ reason = "TLS goes through rustls (ADR 0006)"
 [[bans.deny]]
 crate = "tokio"
 wrappers = [
-  "bitstamp", "game", "server",
+  "bitstamp", "game", "server", "sqlite",
   # third-party
   "axum", "hyper", "hyper-util", "sqlx-core", "sqlx-macros-core", "tokio-rustls", "tokio-stream", "tokio-tungstenite", "tokio-util", "tower", "tower-http",
 ]
@@ -60,7 +63,11 @@ reason = "only the `sqlite` adapter talks to the database"
 
 [[bans.deny]]
 crate = "axum"
-wrappers = ["web", "test-controls", "server"]
+wrappers = [
+  "web", "test-controls", "server",
+  # third-party
+  "tower_governor",
+]
 reason = "only `web`, `test-controls` and `server` serve HTTP"
 
 [[bans.deny]]

@@ -10,10 +10,14 @@ axum.workspace = true
 futures-util.workspace = true
 game.workspace = true
 getrandom.workspace = true
+governor.workspace = true
+guessing.workspace = true
 identity.workspace = true
 prices.workspace = true
 serde.workspace = true
 tower-http.workspace = true
+tower_governor.workspace = true
+tracing.workspace = true
 ts-rs.workspace = true
 
 [lints]

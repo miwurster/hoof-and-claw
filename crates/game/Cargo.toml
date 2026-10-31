@@ -10,8 +10,12 @@ publish.workspace = true
 test-controls = []
 
 [dependencies]
+getrandom.workspace = true
+guessing.workspace = true
+identity.workspace = true
 jiff.workspace = true
 prices.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
