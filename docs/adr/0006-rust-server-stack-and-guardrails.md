@@ -62,4 +62,4 @@ All of these run in the Green gate, and any warning fails it.
 - axum 0.8 has unreleased breaking changes queued, so a 0.9 release during the demo means a small migration.
 - sqlx 0.9 requires Rust 1.94, and `sqlx-cli` is pinned with `--version`, because `cargo install --locked` no longer works for it.
 - Render does not document whether a `nonroot` container may write to its persistent disk.
-  The first deploy checks it, and if it cannot, the image runs as root on distroless.
+  A probe on 2026-10-31 showed it can: Render mounts the disk as `root:1000` with mode `2775` and adds the process to group 1000, so the image stays `nonroot` ("Check the price feeds from Render Frankfurt").

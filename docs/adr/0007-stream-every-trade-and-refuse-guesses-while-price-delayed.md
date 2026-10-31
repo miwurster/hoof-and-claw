@@ -16,6 +16,7 @@ Bitstamp's WebSocket docs page (`https://www.bitstamp.net/websocket/v2/`) blocks
 - A trade event carries `price` as a JSON float and `price_str` as a string, plus the trade `id` and timestamps.
   The REST ticker `GET /api/v2/ticker/btcusd/` returns `last` as a string, with no trade id and a timestamp in whole seconds.
 - The live session saw 12 trades in 90 s, with gaps between 1.5 s and 22.7 s; earlier samples saw gaps up to 31.5 s (ADR 0004).
+- An hour from Render Frankfurt on 2026-10-31 saw 1,159 trades with gaps up to 39.3 s, and all 376 heartbeats answered within 43 ms on one connection that never dropped.
 
 ## Decision
 
@@ -74,5 +75,6 @@ The heartbeat interval, reply timeout, silence limit and backoff bounds are conf
 
 - A guess usually resolves 60 to 90 s after it was placed, as ADR 0004 expects.
 - While Bitstamp is down, nobody can guess and nothing resolves; when it returns, every due guess resolves against the first changed price received.
-- Bitstamp's archived docs may differ from the live page, so the feed check from Render ("Check the price feeds from Render Frankfurt") also confirms the heartbeat and reconnect behaviour.
+- Bitstamp's archived docs may differ from the live page.
+  The feed check from Render ("Check the price feeds from Render Frankfurt") confirmed the heartbeat behaviour, but saw no `bts:request_reconnect` in its hour, so planned reconnects still rest on the archived docs.
 - Alerting when the feed stays delayed belongs to observability, not to this decision.
