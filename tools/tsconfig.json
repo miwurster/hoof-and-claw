@@ -14,5 +14,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["contract/**/*.ts"]
+  "include": ["contract/**/*.ts", "release/**/*.ts"]
 }
