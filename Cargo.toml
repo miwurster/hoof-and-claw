@@ -29,6 +29,7 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 ts-rs = "12.0.1"
 cargo_metadata = "0.23.1"
 
+bitstamp = { path = "crates/bitstamp" }
 game = { path = "crates/game" }
 identity = { path = "crates/identity" }
 prices = { path = "crates/prices" }

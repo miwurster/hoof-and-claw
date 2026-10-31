@@ -12,6 +12,7 @@ allow = [
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
   "BSD-3-Clause",
+  "ISC",
   "MIT",
   "Unicode-3.0",
   "Zlib",
@@ -27,6 +28,10 @@ allow-wildcard-paths = true
 skip = [
   { crate = "syn@2", reason = "the ecosystem is moving to syn 3; clap_derive already has" },
   { crate = "hashbrown@0.16", reason = "sqlx's hashlink lags behind indexmap's hashbrown" },
+  { crate = "getrandom@0.2", reason = "ring, rustls' crypto provider, still uses getrandom 0.2" },
+  { crate = "windows-sys@0.52", reason = "ring, rustls' crypto provider, still uses windows-sys 0.52" },
+  { crate = "getrandom@0.3", reason = "tungstenite's rand 0.9 lags behind; tungstenite 0.29+ would duplicate sha1's digest with sqlx instead" },
+  { crate = "r-efi@5", reason = "tungstenite's rand 0.9 pulls getrandom 0.3, which uses r-efi 5" },
 ]
 
 [[bans.deny]]
@@ -42,9 +47,9 @@ reason = "TLS goes through rustls (ADR 0006)"
 [[bans.deny]]
 crate = "tokio"
 wrappers = [
-  "game", "server",
+  "bitstamp", "game", "server",
   # third-party
-  "axum", "hyper", "hyper-util", "sqlx-core", "sqlx-macros-core", "tokio-stream", "tokio-util", "tower", "tower-http",
+  "axum", "hyper", "hyper-util", "sqlx-core", "sqlx-macros-core", "tokio-rustls", "tokio-stream", "tokio-tungstenite", "tokio-util", "tower", "tower-http",
 ]
 reason = "only `game`, `bitstamp`, `sqlite`, `web`, `test-controls` and `server` may use tokio directly"
 
@@ -57,6 +62,11 @@ reason = "only the `sqlite` adapter talks to the database"
 crate = "axum"
 wrappers = ["web", "test-controls", "server"]
 reason = "only `web`, `test-controls` and `server` serve HTTP"
+
+[[bans.deny]]
+crate = "tokio-tungstenite"
+wrappers = ["bitstamp"]
+reason = "only the `bitstamp` adapter talks WebSocket"
 
 [[bans.deny]]
 crate = "tower-http"

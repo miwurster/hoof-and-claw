@@ -3,7 +3,6 @@
 mod clock;
 mod configuration;
 mod logging;
-mod price_source;
 
 use std::time::Duration;
 
@@ -35,16 +34,14 @@ async fn main() -> anyhow::Result<()> {
             source: controls,
             game: game.clone(),
         });
-        serve(configuration, game, source, Some(test_controls)).await
+        serve(configuration, game, source, async {}, Some(test_controls)).await
     };
     #[cfg(not(feature = "test-controls"))]
-    let result = serve(
-        configuration,
-        Game::new(clock::SystemClock, Broadcast::new()),
-        price_source::Unconnected,
-        None,
-    )
-    .await;
+    let result = {
+        let (source, bitstamp) = bitstamp::Bitstamp::start(configuration.bitstamp())?;
+        let game = Game::new(clock::SystemClock, Broadcast::new());
+        serve(configuration, game, source, bitstamp.close(), None).await
+    };
 
     database.close().await;
     result?;
@@ -56,6 +53,7 @@ async fn serve<C: Clock, F: Fanout>(
     configuration: Configuration,
     game: Game<C, F>,
     source: impl PriceSource,
+    close_source: impl Future<Output = ()> + Send + 'static,
     test_controls: Option<axum::Router>,
 ) -> anyhow::Result<()> {
     let running = tokio::spawn({
@@ -77,6 +75,8 @@ async fn serve<C: Clock, F: Fanout>(
     let served = axum::serve(listener, router)
         .with_graceful_shutdown(async move {
             shutdown_signal().await;
+            // Closing the connection to the Price source makes the price Price delayed (ADR 0007).
+            close_source.await;
             // Graceful shutdown waits for every open stream, so the streams end first.
             game.end_streams();
         })
