@@ -34,7 +34,7 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 `acceptance/`, Playwright Test, cases written in the TypeScript DSL in `acceptance/cases/`.
 
 - Run all: `pnpm --filter acceptance test`.
-- Run the performance cases and their budgets: `mise run perf`; the numbers land in the run's artefacts.
+- Run the performance cases and their budgets: `mise run perf`; each case writes its numbers to `measurements.json` in its folder under `acceptance/test-results/performance/`, which CI keeps as the artefact `performance`.
 - Run one case alone: `pnpm --filter acceptance test --project api -g "<case title>"`, and again with `--project ui`.
 - A new case is written in the DSL, for example:
 
