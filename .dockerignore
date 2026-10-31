@@ -1,0 +1,12 @@
+# Only the sources the image builds from.
+.git/
+**/node_modules/
+target/
+spa/dist/
+acceptance/test-results/
+acceptance/playwright-report/
+acceptance/blob-report/
+infra/
+*.db
+*.db-shm
+*.db-wal
