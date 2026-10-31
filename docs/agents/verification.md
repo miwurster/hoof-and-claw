@@ -1,7 +1,6 @@
 # Verification
 
 How the `verification` skill proves a change in this repo.
-Draft: the tasks below are built with the first code.
 Read the routes from the code, not from this file: the game's routes from the router in `crates/web`, the test controls from `crates/test-controls`.
 
 ## Green gate

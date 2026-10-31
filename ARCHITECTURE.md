@@ -1,8 +1,6 @@
 # Architecture
 
 Where code goes in this repository: workspace, crate, package, module, and what may depend on what.
-
-There is no code yet; this file is the target shape, and the first code is written to it.
 Properties of code, how it is written rather than where it lives, are in `CODING_STANDARDS.md`.
 The ubiquitous language lives in `GLOSSARY.md`.
 
