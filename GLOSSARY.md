@@ -32,7 +32,7 @@ The BTC/USD price at the moment a guess is placed.
 _Avoid_: Entry price, guess price, opening price
 
 **End price**:
-The BTC/USD price a guess is resolved against.
+The BTC/USD price a guess is resolved against: the first price observed at least 60 seconds after the guess was placed that differs from the Start price.
 _Avoid_: Exit price, resolution price, closing price
 
 **Outcome**:
