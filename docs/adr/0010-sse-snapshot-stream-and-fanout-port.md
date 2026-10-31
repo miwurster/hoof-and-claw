@@ -22,6 +22,7 @@ This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time deli
   Changes between live and Price delayed are not throttled.
   Resolution still uses every trade (ADR 0007).
   The throttle sits in `game`, before the port, so every adapter gets the same rate.
+  It runs on `tokio`'s real time, not on the `Clock` port, which is the domain's time only (ADR 0011).
 - **Every tab of the Player.** Every event about a Player goes to every open tab of that Player: Guess placed, and Guess resolved with its Outcome, End price and new Score.
   A guess placed in one tab therefore shows up in the others.
 - **Order on each trade.** For each received price, `game`:
@@ -39,7 +40,7 @@ This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time deli
   The client reconnects and gets a new snapshot, which already contains the Score and any Outcome it missed, so no resolution is lost.
 - **Keepalive.** The server sends an SSE comment every 15 s.
   A client that receives nothing for 45 s treats the stream as dead and reconnects after a random delay.
-  Both values are configuration, with these defaults.
+  Both values are configuration, with these defaults, and run on `tokio`'s real time like the throttle.
 
 ## The `Fanout` port
 

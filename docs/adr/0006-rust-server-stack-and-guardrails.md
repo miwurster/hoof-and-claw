@@ -56,7 +56,7 @@ All of these run in the Green gate, and any warning fails it.
 ## Consequences
 
 - The acceptance test suite talks to the server over HTTP and the UI, so it may use another language.
-  The acceptance test architecture decides which.
+  ADR 0011 chooses TypeScript with Playwright.
 - The frontend shares no code with the server.
   How its types follow the server's API is part of the API contract.
 - axum 0.8 has unreleased breaking changes queued, so a 0.9 release during the demo means a small migration.

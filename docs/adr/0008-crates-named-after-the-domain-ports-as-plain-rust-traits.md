@@ -9,6 +9,7 @@ Ports and adapters are written with Rust's ordinary features (traits, generics, 
 ## Crates
 
 All crates sit flat under `crates/` in a virtual workspace.
+The acceptance test suite is not a crate but the TypeScript package `acceptance/` (ADR 0011).
 
 | Crate | Kind | Holds | May depend on |
 | --- | --- | --- | --- |
@@ -20,8 +21,7 @@ All crates sit flat under `crates/` in a virtual workspace.
 | `sqlite` | adapter | every core's store port on one database file and one write connection | the cores, `sqlx` |
 | `web` | adapter | axum routes, the SSE stream, the identity cookie, static files | `game`, the cores, `axum`, `tower-http` |
 | `server` | binary | configuration, wiring, start-up | every crate above |
-| `test-controls` | test adapter | a controllable `Clock` and `PriceSource`, and the HTTP endpoints that drive them | `game`, `prices`, `axum` |
-| `acceptance` | tests | the acceptance test suite against a running server | test-only crates |
+| `test-controls` | test adapter | a controllable `Clock` and `PriceSource`, and the HTTP endpoints that drive them (ADR 0011) | `game`, `prices`, `axum` |
 
 Inside a crate, modules are named after glossary terms (`guess.rs`, `score.rs`), never `models/`, `services/`, `repositories/` or `utils/`.
 
@@ -99,7 +99,7 @@ The release image is built without it, and a check in the gate asserts that the 
 
 ## Consequences
 
-- There are ten crates for a small game, so builds link more units; cargo-chef's cached dependency layer (ADR 0006) keeps that cost in the image build.
+- There are nine crates for a small game, so builds link more units; cargo-chef's cached dependency layer (ADR 0006) keeps that cost in the image build.
 - The single `sqlite` crate implements every store port because there is one database file and one write connection.
   It can split per area when an area moves to another store.
-- How the acceptance tests use `test-controls` is decided in "Acceptance test architecture".
+- How the acceptance tests use `test-controls` is decided in ADR 0011: they send prices, lose and restore the connection, advance the clock and set it.
