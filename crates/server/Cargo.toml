@@ -11,6 +11,7 @@ test-controls = ["dep:test-controls"]
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+bitstamp.workspace = true
 clap.workspace = true
 game.workspace = true
 jiff.workspace = true
