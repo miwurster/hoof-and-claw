@@ -30,7 +30,9 @@ Both run by hand from the acceptance package, outside the Green gate and without
 
 - **`pnpm smoke`** after every Release: the page loads, a price is visible, and the SSE stream delivers its snapshot.
   The health endpoint reports Render's `RENDER_GIT_COMMIT`, so the smoke test also checks that the released SHA is live.
-- **`pnpm smoke:hold`** once after the first Release holds an SSE stream open for an hour to show that Render's proxy does not cut it.
+- **`pnpm smoke:hold`** once after the first Release holds an SSE stream open for two hours to show that Render's proxy does not cut it.
+  Render documents a 100-minute limit on HTTP responses without saying whether it applies to SSE, and two hours cover it.
+  If the limit cuts the stream, the client reconnects and rebuilds its state from the snapshot, so the game keeps working.
   If it does, the heartbeat interval changes, not the architecture.
 
 ## Considered Options

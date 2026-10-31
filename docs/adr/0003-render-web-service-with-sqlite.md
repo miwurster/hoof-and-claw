@@ -8,8 +8,12 @@ One always-on process is the simplest design that meets every rule of the brief,
 ## Considered Options
 
 - **AWS serverless: CloudFront, S3, Lambda in Rust, DynamoDB, an EventBridge Scheduler call per guess.** Not chosen for the demo; it is the first candidate on the scale path.
-  It costs about 0 to 2 USD a month and matches "AWS preferred", but nothing holds the price feed, so browsers poll a cached price and the server reads trades over REST.
-  EventBridge Scheduler fires with 60-second precision, so a guess nobody watches resolves up to about two minutes after it falls due.
+  It costs about 0 to 2 USD a month and matches "AWS preferred".
+  A scheduler call per guess is too coarse: EventBridge Scheduler fires with 60-second precision, so a guess nobody watches resolves up to about two minutes after it falls due.
+  A Rust Lambda can instead hold the price feed in overlapping 15-minute runs started every 13 minutes, within the free tier, and resolve due guesses on every trade ("AWS serverless for the game", branch `research/aws-serverless-for-the-game`).
+  It still gives up one clock, because accepting a guess and receiving prices run on different machines (ADR 0002), and push, because browsers poll a cached price; CloudFront cannot share one SSE stream across viewers.
+  A crashed run can leave the feed down for minutes.
+  Push services such as AppSync Events or IoT Core charge about 1 USD per million messages, so one price a second to 1,000 Players costs about 2,600 USD a month.
 - **AWS always-on: App Runner or ECS Fargate.** Rejected.
   App Runner costs about 14 USD a month, and Fargate needs a load balancer that pushes it past 20 USD.
 - **Cloudflare Workers with Durable Objects.** Rejected.
@@ -31,7 +35,7 @@ One always-on process is the simplest design that meets every rule of the brief,
   Open guesses survive, because the server persists a guess before it acknowledges it, and they resolve on the first changed price after the restart (see ADR 0002).
 - SSE streams and the feed close on every deploy.
   Clients reconnect and rebuild their state from the snapshot that opens every stream (ADR 0010), and the server sends SSE heartbeats, because Render documents no timeout for streaming responses.
-  A check run by hand after the first Release holds an SSE stream open for an hour against the deployed service (ADR 0013).
+  A check run by hand after the first Release holds an SSE stream open for two hours against the deployed service (ADR 0013).
 - The server pushes at most one price per second to browsers, and only when it changed.
   Resolution still uses every price it receives.
   At 20 viewers for 4 hours a day this is about 1.3 GB a month, inside the 5 GB Render includes.
@@ -76,10 +80,13 @@ The Price source does not grow with the number of Players, because the server ne
 What each step means for the application:
 
 - **1,000 Players.** The same single process and SQLite are enough on a larger Render instance.
-  The price push has to leave the process for a cheaper channel, for example a CDN in front of the stream or a managed push service, because of traffic cost, not capacity.
+  Prices stay on the game server's own SSE stream.
+  A managed push service such as AppSync Events or IoT Core charges about 1 USD per million messages, about 2,600 USD a month for one price a second to 1,000 Players, and CloudFront cannot share one SSE stream across viewers, so bandwidth on the game server stays the cheapest channel ("Scaling the game process" and "AWS serverless for the game", branches `research/scaling-the-game-process` and `research/aws-serverless-for-the-game`).
 - **10,000 Players.** One larger process with 2 CPU and 2 to 4 GB still carries the connections and about 420 writes a second, with writes batched into one transaction per price.
   It has no redundancy, and a deploy drops 10,000 connections at once, so clients reconnect with random delay.
-  This is the point to move to AWS: a managed database, prices delivered through CloudFront or a managed push service, and SQLite replaced behind the store port.
+  Availability forces a change before capacity does: Render runs zero-downtime deploys only without a disk, so SQLite gives way to managed Postgres behind the store port, and a Postgres advisory lock picks the one process that holds the feed and resolves.
+  A second instance follows at about 5,000 sustained Players or when one failing instance is no longer acceptable; Postgres `LISTEN/NOTIFY` carries prices and Player events between instances, and clients need no sticky sessions because every stream opens with a snapshot.
+  This can stay on Render or move to AWS or another cloud; the reasons to move are traffic cost per GB, failover across availability zones, and where the organisation already runs.
 - **100,000 Players.** One process is no longer enough.
   One ingesting process, with a standby that takes over through a lease, publishes each price to several stateless SSE servers over a pub/sub channel, for example Redis or NATS.
   Guesses move to Postgres or DynamoDB, and resolution is partitioned by Player, each partition with its own index of due guesses.

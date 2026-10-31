@@ -63,7 +63,7 @@ The name `Fanout` is not a glossary term, because delivering events is infrastru
 The port carries both kinds of event although they scale differently.
 Prices are one stream for everyone and suit a broadcast channel or a cache; Player events are small and must be routed to one Player.
 For the demo, two traits would be two seams with the same adapter behind them.
-The scale path below splits `Fanout` into a price broadcast and Player notifications when prices leave the process.
+The scale path below splits `Fanout` into a price broadcast and Player notifications only when stream servers become separate from the ingesting process.
 
 ## Considered Options
 
@@ -97,14 +97,13 @@ The scale path below splits `Fanout` into a price broadcast and Player notificat
 The numbers come from ADR 0003's scale path, which assumes about one guess a minute per concurrent Player and one price event a second.
 The domain core stays the same at every step; what changes is the adapter behind `Fanout`, the store, and how resolution is partitioned.
 
-- **1,000 Players.** One process is still enough, but outbound traffic is the first cost (ADR 0003).
-  `Fanout` splits into a price broadcast and Player notifications.
-  The price broadcast moves to a channel built for one-to-many delivery, such as a CDN in front of a price-only stream or a managed push service.
-  Player notifications stay on the game server's own stream, because they are few and small.
+- **1,000 Players.** One process is still enough, and prices stay on the game server's own stream.
+  A managed push service costs far more per message than the bandwidth, and CloudFront cannot share one SSE stream across viewers (ADR 0003).
+  `Fanout` keeps its in-process adapter.
 - **10,000 Players.** One larger process still carries the connections.
   A deploy drops every stream at once, so clients reconnect with exponential backoff and a random delay of several seconds.
   Every reconnect costs one snapshot: the latest price from memory and one Player read from the store.
-  This is the step to AWS that ADR 0003 describes.
+  Availability brings the first change, as ADR 0003 describes: with more than one process, `Fanout` gets an adapter over Postgres `LISTEN/NOTIFY` that carries prices and Player events from the leader to every instance.
 - **100,000 Players.** One ingesting process, with a standby that takes over through a lease, receives the trades.
   It stamps each price with its receipt time and a sequence number that only grows, and publishes it over a pub/sub channel such as Redis or NATS.
   Stateless SSE servers subscribe to prices and to the Player events of the tabs they hold.

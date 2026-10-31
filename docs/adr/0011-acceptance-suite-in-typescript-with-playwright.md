@@ -93,7 +93,7 @@ A second price within the same second therefore reaches the test after at most o
 
 The suite runs in the Green gate, locally and in CI, against the local build with `test-controls`.
 It never runs against the deployed service, which has no control channels and a real price.
-The checks against the deployed service, `pnpm smoke` after every Release and `pnpm smoke:hold`, which holds an SSE stream open for an hour (ADR 0003), are a separate small set without control channels, run by hand (ADR 0013).
+The checks against the deployed service, `pnpm smoke` after every Release and `pnpm smoke:hold`, which holds an SSE stream open for two hours (ADR 0003), are a separate small set without control channels, run by hand (ADR 0013).
 
 - **Browser.** Only Chromium runs in the Green gate.
 - **No retries.** Retries are 0, so a flaky test turns the gate red instead of slipping through.
