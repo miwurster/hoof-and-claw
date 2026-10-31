@@ -22,12 +22,14 @@ The palette, "tracks at night", takes its colours from animal tracks in earth, b
 | Turf    | `#2A2721` | Raised surfaces: guess card, buttons                   |
 | Bone    | `#EDE6D6` | Primary text, price, wordmark                          |
 | Flint   | `#8F887A` | Muted text: rules line, "Price delayed"                |
-| Pasture | `#7DBB6E` | Up                                                     |
-| Rust    | `#D9573B` | Down                                                   |
+| Pasture | `#A9D79B` | Up                                                     |
+| Rust    | `#D0533A` | Down                                                   |
 | Horn    | `#D4B26A` | Logo ampersand and keyboard focus ring only            |
 
 Pasture and Rust mean Up and Down and nothing else.
 Every use of Pasture or Rust comes with an arrow and a label, so players with red/green colour blindness can still play.
+Pasture and Rust also differ in lightness, not only in hue: Pasture is light, Rust is darker, at about 2.6:1 contrast against each other.
+Keep that gap when adjusting either colour; a simulated deuteranopia view showed two hue-only colours collapsing into the same olive.
 
 ## Typography
 
@@ -36,14 +38,17 @@ The price, the countdown and the score use tabular figures so the digits don't s
 
 ## Logo
 
-Three concepts go to mockups; bull and bear heads are out.
+The logo is a mark beside a wordmark.
+The mark is a rounded Turf tile with a cloven hoof print in Pasture on the left and three claw slashes in Rust on the right.
+The shapes carry the meaning on their own, so the mark reads without colour.
+The wordmark is "Hoof & Claw" in Geist Sans, Bone, with the ampersand in Horn.
 
-1. **Ampersand mark.** The "&" of the wordmark is drawn from a cloven hoof print and a claw slash.
-2. **Split mark.** A compact mark with a hoof print on a Pasture half and three claw slashes on a Rust half, beside a plain wordmark.
-   It doubles as the favicon.
-3. **Tracks.** A hoof print and claw marks crossing a single price line.
+Below 20 px the mark switches to a simplified drawing: a wider cleft in the hoof and two heavier claw slashes instead of three.
 
-Only the chosen logo enters the repo, as SVG.
+- [`assets/brand/mark.svg`](../../assets/brand/mark.svg): the mark, for 20 px and up.
+- [`assets/brand/favicon.svg`](../../assets/brand/favicon.svg): the simplified mark, for the favicon and other sizes below 20 px.
+
+Ampersand, split and tracks concepts were compared in mockups; bull and bear heads were ruled out before that.
 
 ## Layout
 
