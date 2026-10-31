@@ -20,7 +20,7 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 
 ## Doctor
 
-`curl -s localhost:<port>/health` reports the commit, which must equal `git rev-parse HEAD` of the launched tree, and `test_controls: true`.
+`curl -s localhost:<port>/health` reports the commit as `build`, which must equal `git rev-parse HEAD` of the launched tree, and `"testControls": true`.
 
 ## Drive
 

@@ -17,7 +17,7 @@ A cookie works with `EventSource`, which cannot set headers, keeps the token awa
 
 - The server sets the cookie on the first visit but stores a Player only on the first Guess, so bots and drive-by visits spend none of the free tier's daily write budget.
   A token with no stored Player reads as Score 0 with no Open guess.
-- The cookie lasts 400 days, the most Chrome allows, and is re-issued with a fresh expiry on each visit, so an active Player keeps it through the six-month demo.
+- The cookie lasts 400 days, the most Chrome allows, and is re-issued with a fresh expiry on each visit, so an active Player keeps it through the three-month demo.
   The server sets no expiry of its own.
 - When the cookie is lost, so is the Player, and the browser starts over at 0.
   The UI says in one line that the Score lives in this browser.
