@@ -47,8 +47,8 @@ One always-on process is the simplest design that meets every rule of the brief,
 - GitHub Actions builds a Docker image, pushes it to the public GitHub Container Registry, and Render deploys that image, so the image that passed the Green gate is the one that runs and no Render build minutes are spent.
 - Terraform with the `render-oss/render` provider describes the service, disk, domain, health check and environment, and keeps its state in HCP Terraform Free.
   All-Inkl has no Terraform provider, so the `CNAME` from `hoof-and-claw` to the service's `onrender.com` host is a one-time manual step.
-- Render shares outbound IP addresses per region, and nobody has yet checked that Coinbase and Kraken accept connections from Render Frankfurt.
-  If one refuses, the fallback is the other exchange, then another Render region.
+- Render shares outbound IP addresses per region, and nobody has yet checked that the chosen Price source and its fallback accept connections from Render Frankfurt.
+  If one refuses, the fallback is the other source, then another Render region.
 - `miwurster.com` expires on 2027-03-22 and renews automatically; if renewal failed, the demo's address would go with it.
 
 ## Scale path
