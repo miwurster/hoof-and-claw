@@ -49,7 +49,10 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 
 ## Observe
 
-Only the four `test-controls` commands, over HTTP on the launched instance, at the routes `crates/test-controls` defines:
+Side effects: none beyond the public interface.
+Score, Outcome and the Open guess are read through the HTTP API and the SSE stream, never from the SQLite file.
+
+Time and price: only the four `test-controls` commands, at the routes `crates/test-controls` defines.
 
 1. Send a price.
 2. Lose the connection to the Price source, or restore it.
@@ -57,4 +60,3 @@ Only the four `test-controls` commands, over HTTP on the launched instance, at t
 4. Set the clock to a time.
 
 The clock stands still until a command moves it, and a guess resolves only on a received price.
-Reading the SQLite file is not a channel; side effects are read through the HTTP API and the SSE stream.
