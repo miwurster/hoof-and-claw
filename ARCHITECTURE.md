@@ -100,15 +100,15 @@ A client-rendered Vite and React app, served as static files by the game server 
 
 A Playwright Test package in Dave Farley's four layers, one folder each:
 
-| Folder              | Holds                                                                            | May import                                         |
-| ------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `cases/`            | test cases in glossary terms                                                     | `dsl/`                                             |
-| `performance/`      | performance cases with their budgets (ADR 0015)                                  | `dsl/`                                             |
-| `smoke/`            | the checks against the deployed service, without control channels (ADR 0013)    | `dsl/`                                             |
-| `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface                               |
-| `drivers/ui/`       | the driver for the SPA in a browser                                              | Playwright                                         |
-| `drivers/api/`      | the driver for the HTTP API and the SSE stream                                   | Playwright's request API, `contract/`              |
-| `drivers/controls/` | calls to the `test-controls` endpoints                                           | Playwright's request API, `contract/test-controls` |
+| Folder              | Holds                                                                                                    | May import                                         |
+| ------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `cases/`            | test cases in glossary terms                                                                             | `dsl/`                                             |
+| `performance/`      | performance cases with their budgets (ADR 0015)                                                          | `dsl/`                                             |
+| `smoke/`            | the checks against the deployed service, without control channels (ADR 0013)                             | `dsl/`                                             |
+| `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`, the group `players(n)`) and their `should` assertions | the driver interface                               |
+| `drivers/ui/`       | the driver for the SPA in a browser                                                                      | Playwright                                         |
+| `drivers/api/`      | the driver for the HTTP API and the SSE stream                                                           | Playwright's request API, `contract/`              |
+| `drivers/controls/` | calls to the `test-controls` endpoints                                                                   | Playwright's request API, `contract/test-controls` |
 
 No driver imports another; enforced by `acceptance/.dependency-cruiser.cjs`.
 Every case runs in the Playwright projects `ui` and `api`; a case limited to one carries that project's tag with the reason beside it.

@@ -15,6 +15,7 @@
     "@types/node": "26.6.6",
     "contract": "workspace:*",
     "dependency-cruiser": "18.7.0",
+    "hdr-histogram-js": "3.0.1",
     "typescript": "6.0.3"
   }
 }

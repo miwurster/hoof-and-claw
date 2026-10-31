@@ -119,3 +119,25 @@ export type Drivers = {
   readonly server: (connection: Connection) => Promise<ServerDriver>;
   readonly controls: (connection: Connection) => Promise<ControlsDriver>;
 };
+
+/**
+ * A Player under load, whose steps report when they happened, in milliseconds on the harness's own clock
+ * (`performance.now()`), so a step that measures needs no polling.
+ * Prices are dollar strings such as "64,000.00". Every step rejects on an error.
+ */
+export type MeasuredPlayerDriver = {
+  /** Opens the game's stream and answers how long its first event took to arrive. */
+  readonly opensTheGame: () => Promise<number>;
+  /** Places a Guess and answers how long the server took to accept it; rejects when it is refused. */
+  readonly guesses: (direction: Direction) => Promise<number>;
+  /** Answers when the price first arrived on the stream, waiting for it if it has not yet. */
+  readonly receives: (price: string) => Promise<number>;
+  /** Answers when the event that the Player's Guess resolved arrived on the stream, waiting for it if it has not yet. */
+  readonly receivesTheResolution: () => Promise<number>;
+  /** How many of the Player's streams the server has closed or broken off. */
+  readonly streamsClosedByTheServer: () => number;
+  readonly close: () => Promise<void>;
+};
+
+/** The performance project's driver for a Player under load (ADR 0015). */
+export type MeasuredPlayers = (connection: Connection) => Promise<MeasuredPlayerDriver>;

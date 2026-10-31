@@ -2,15 +2,20 @@
 import { test as base } from "@playwright/test";
 
 import { Clock } from "./clock";
-import type { ControlsDriver, Drivers, PlayerDriver } from "./drivers";
+import type { ControlsDriver, Drivers, MeasuredPlayers, PlayerDriver } from "./drivers";
+import { Measurements } from "./measurements";
+import type { Budgets } from "./measurements";
 import { freshNetwork, Neighbours } from "./network";
 import { Player } from "./player";
+import { Players } from "./players";
 import { PriceSource } from "./price-source";
 import { Server } from "./server";
 import { startServer } from "./server-process";
 import type { ServerProcess } from "./server-process";
 
 export { milliseconds, seconds } from "./clock";
+
+export type { Budgets } from "./measurements";
 
 type Actors = {
   readonly alice: Player;
@@ -21,6 +26,8 @@ type Actors = {
   readonly priceSource: PriceSource;
   readonly clock: Clock;
   readonly server: Server;
+  /** A group of this many Players under load, each from a network of their own (ADR 0015). */
+  readonly players: (count: number) => Promise<Players>;
 };
 
 type Infrastructure = {
@@ -33,6 +40,13 @@ type Infrastructure = {
 export type Options = {
   /** The project's drivers, set in playwright.config.ts. */
   readonly drivers: Drivers;
+  /** The performance project's Players under load and the budgets they are held to, set in playwright.config.ts. */
+  readonly measuring: Measuring;
+};
+
+type Measuring = {
+  readonly players: MeasuredPlayers;
+  readonly budgets: Budgets;
 };
 
 type Worker = {
@@ -46,6 +60,20 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
       player: () => Promise.reject(new Error("no player driver configured")),
       server: () => Promise.reject(new Error("no server driver configured")),
       controls: () => Promise.reject(new Error("no controls driver configured")),
+    },
+    { option: true },
+  ],
+
+  measuring: [
+    {
+      players: () => Promise.reject(new Error("no measured player driver configured")),
+      budgets: {
+        priceFanOut: {},
+        placingAGuess: {},
+        resolutionBurst: {},
+        firstEvent: {},
+        residentMemory: {},
+      },
     },
     { option: true },
   ],
@@ -153,6 +181,36 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     }
 
     await driver.close();
+  },
+
+  // Every case writes its numbers to measurements.json in its output folder, which CI keeps as an artefact.
+  players: async ({ measuring, serverProcess, browser, playwright }, use, testInfo) => {
+    const measurements = new Measurements(measuring.budgets);
+    const groups: Players[] = [];
+
+    await use(async (count) => {
+      const drivers = await Promise.all(
+        Array.from({ length: count }, () =>
+          measuring.players({
+            baseURL: serverProcess.baseURL,
+            browser,
+            request: playwright.request,
+            network: freshNetwork(),
+          }),
+        ),
+      );
+
+      const group = new Players(drivers, measurements, serverProcess.residentMemory);
+
+      groups.push(group);
+
+      return group;
+    });
+
+    await Promise.all(groups.map((group) => group.leave()));
+
+    await measurements.keep(testInfo);
+    measurements.destroy();
   },
 
   // Keeps the worker's server log beside a failed test's trace and screenshot.

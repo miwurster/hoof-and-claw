@@ -19,6 +19,8 @@ import type { View } from "./stream";
 import { expectIdentityCookie, issued, setCookies } from "./identity";
 import { WithoutAPage } from "./without-a-page";
 
+export { measuredApiPlayer } from "./measured";
+
 export { apiServer } from "./server";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";

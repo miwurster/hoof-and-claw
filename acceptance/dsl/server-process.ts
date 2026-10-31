@@ -25,6 +25,8 @@ export type ServerProcess = {
   /** Starts the server again on the same port and database, as after a deploy. */
   readonly startsAgain: () => Promise<void>;
   readonly isRunning: () => boolean;
+  /** The server's resident memory in bytes, as `ps` reports it. */
+  readonly residentMemory: () => number;
   readonly stop: () => Promise<void>;
 };
 
@@ -55,6 +57,7 @@ export async function startServer(): Promise<ServerProcess> {
       running = true;
     },
     isRunning: () => running,
+    residentMemory: () => residentMemory(launched.child),
     stop: async () => {
       await stop(launched.child);
       rmSync(dir, { recursive: true, force: true });
@@ -101,6 +104,21 @@ async function launch(
   });
 
   return { child, port: listening };
+}
+
+/** The server is the process named `server` in the process group `mise run launch` leads. */
+function residentMemory(child: ChildProcess): number {
+  const table = execFileSync("ps", ["-A", "-o", "pgid=,rss=,comm="], { encoding: "utf8" });
+
+  for (const line of table.split("\n")) {
+    const [, group, kilobytes] = /^\s*(\d+)\s+(\d+)\s+(?:.*\/)?server$/u.exec(line) ?? [];
+
+    if (Number(group) === child.pid && kilobytes !== undefined) {
+      return Number(kilobytes) * 1024;
+    }
+  }
+
+  throw new Error(`no process named server in the process group ${String(child.pid)}`);
 }
 
 async function stop(child: ChildProcess): Promise<Stopped> {
