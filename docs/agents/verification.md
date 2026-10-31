@@ -9,7 +9,7 @@ Read the routes from the code, not from this file: the game's routes from the ro
 
 ## Launch
 
-`PORT=<port> DATABASE_PATH=<file> mise run launch` builds the SPA and `server` with the Cargo feature `test-controls` and starts the server on an empty SQLite file, migrations included.
+`PORT=<port> DATABASE_PATH=<file> mise run launch` builds the SPA and `server` with the Cargo feature `test-controls` in the Cargo profile `gate` (ADR 0014) and starts the server on an empty SQLite file, migrations included.
 It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the commit it was built from.
 
 - **Ready signal:** the server logs `listening on <address>` once migrations ran; `GET /health` then answers 200.
@@ -34,6 +34,7 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 `acceptance/`, Playwright Test, cases written in the TypeScript DSL in `acceptance/cases/`.
 
 - Run all: `pnpm --filter acceptance test`.
+- Run the performance cases and their budgets: `mise run perf`; the numbers land in the run's artefacts.
 - Run one case alone: `pnpm --filter acceptance test --project api -g "<case title>"`, and again with `--project ui`.
 - A new case is written in the DSL, for example:
 
