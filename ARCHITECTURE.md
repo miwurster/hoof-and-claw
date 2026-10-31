@@ -4,7 +4,7 @@ Where code goes in this repository: workspace, crate, package, module, and what 
 Read it before you add a crate, package, module, port or adapter, wire the server, or add a component or test layer.
 
 There is no code yet; this file is the target shape, and the first code is written to it.
-Properties of code, how it is written rather than where it lives, are in `CODING_STANDARDS.md` and the `kipu-code-review` lenses.
+Properties of code, how it is written rather than where it lives, are in `CODING_STANDARDS.md`.
 The ubiquitous language lives in `GLOSSARY.md`.
 
 A rule that names a test fails the Green gate (`mise run gate`).
@@ -23,17 +23,17 @@ Crates are named after areas of the game, not after technical layers.
 Each area's core is a synchronous crate that takes time and prices as values and returns decisions.
 `game` is the one asynchronous shell that runs the cores; adapters are named after their technology and plug into ports the cores own.
 
-| Crate | Kind | Holds | May depend on |
-| --- | --- | --- | --- |
-| `prices` | core, sync | Price, Price source, the latest price, Price delayed, the `PriceSource` port | `thiserror`, pure crates |
-| `guessing` | core, sync | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due guesses, its store port | `prices`, `thiserror`, pure crates |
-| `identity` | core, sync | issuing and checking the anonymous token, token to Player ID, its store port | `guessing`, `thiserror`, pure crates |
-| `game` | shell, async | runs the cores on received prices, persists before it acknowledges, publishes events; owns the `Clock` and `Fanout` ports | the cores, `tokio` |
-| `bitstamp` | adapter | `PriceSource` over Bitstamp's WebSocket feed and REST seed | `prices`, `tokio`, `tokio-tungstenite`, `rustls` |
-| `sqlite` | adapter | every core's store port on one database file and one write connection | the cores, `sqlx` |
-| `web` | adapter | axum routes, the SSE stream, the identity cookie, static files | `game`, the cores, `axum`, `tower-http` |
-| `server` | binary | configuration, wiring, start-up | every crate above |
-| `test-controls` | test adapter | the controllable `Clock` and `PriceSource` and the HTTP endpoints that drive them | `game`, `prices`, `axum` |
+| Crate           | Kind         | Holds                                                                                                                      | May depend on                                    |
+| --------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `prices`        | core, sync   | Price, Price source, the latest price, Price delayed, the `PriceSource` port                                               | `thiserror`, pure crates                         |
+| `guessing`      | core, sync   | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due guesses, its store port | `prices`, `thiserror`, pure crates               |
+| `identity`      | core, sync   | issuing and checking the anonymous token, token to Player ID, its store port                                               | `guessing`, `thiserror`, pure crates             |
+| `game`          | shell, async | runs the cores on received prices, persists before it acknowledges, publishes events; owns the `Clock` and `Fanout` ports  | the cores, `tokio`                               |
+| `bitstamp`      | adapter      | `PriceSource` over Bitstamp's WebSocket feed and REST seed                                                                 | `prices`, `tokio`, `tokio-tungstenite`, `rustls` |
+| `sqlite`        | adapter      | every core's store port on one database file and one write connection                                                      | the cores, `sqlx`                                |
+| `web`           | adapter      | axum routes, the SSE stream, the identity cookie, static files                                                             | `game`, the cores, `axum`, `tower-http`          |
+| `server`        | binary       | configuration, wiring, start-up                                                                                            | every crate above                                |
+| `test-controls` | test adapter | the controllable `Clock` and `PriceSource` and the HTTP endpoints that drive them                                          | `game`, `prices`, `axum`                         |
 
 The "May depend on" column is enforced by `crate_graph_follows_the_table` in `crates/server/tests/architecture.rs`, which reads `cargo metadata`.
 Only the crates in the table may depend directly on `tokio`, `sqlx`, `axum`, `tower-http` and `tokio-tungstenite`; enforced by cargo-deny `wrappers` in `deny.toml`.
@@ -45,13 +45,13 @@ No module is called `models`, `services`, `repositories`, `utils` or `helpers`; 
 
 ### Ports
 
-| Port | Owned by | Real adapter | Test adapter |
-| --- | --- | --- | --- |
-| `PriceSource` | `prices` | `bitstamp` | the controllable source in `test-controls` |
-| `Clock` | `game` | the system clock in `server` | the controllable clock in `test-controls` |
-| one store port per core | `guessing`, `identity` | `sqlite` | a hand-written in-memory fake in the core |
-| `Identity` | `identity` | the anonymous token, its cookie handled in `web` | a hand-written in-memory fake |
-| `Fanout` | `game` | the in-process broadcast in `game` | a recording fake in `game` |
+| Port                    | Owned by               | Real adapter                                     | Test adapter                               |
+| ----------------------- | ---------------------- | ------------------------------------------------ | ------------------------------------------ |
+| `PriceSource`           | `prices`               | `bitstamp`                                       | the controllable source in `test-controls` |
+| `Clock`                 | `game`                 | the system clock in `server`                     | the controllable clock in `test-controls`  |
+| one store port per core | `guessing`, `identity` | `sqlite`                                         | a hand-written in-memory fake in the core  |
+| `Identity`              | `identity`             | the anonymous token, its cookie handled in `web` | a hand-written in-memory fake              |
+| `Fanout`                | `game`                 | the in-process broadcast in `game`               | a recording fake in `game`                 |
 
 - A port is a plain trait named after the capability in glossary terms: `PriceSource`, never `PriceSourcePort`, `IPriceSource`, `PriceSourceImpl`, or a `Service`, `Manager` or `Repository` suffix.
 - A trait exists only where two implementations exist; everything else is a concrete type or a free function.
@@ -89,13 +89,13 @@ A client-rendered Vite and React app, served as static files by the game server 
 
 A Playwright Test package in Dave Farley's four layers, one folder each:
 
-| Folder | Holds | May import |
-| --- | --- | --- |
-| `cases/` | test cases in glossary terms | `dsl/` |
-| `dsl/` | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface |
-| `drivers/ui/` | the driver for the SPA in a browser | Playwright |
-| `drivers/api/` | the driver for the HTTP API and the SSE stream | Playwright's request API |
-| `drivers/controls/` | calls to the `test-controls` endpoints | Playwright's request API |
+| Folder              | Holds                                                                            | May import               |
+| ------------------- | -------------------------------------------------------------------------------- | ------------------------ |
+| `cases/`            | test cases in glossary terms                                                     | `dsl/`                   |
+| `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface     |
+| `drivers/ui/`       | the driver for the SPA in a browser                                              | Playwright               |
+| `drivers/api/`      | the driver for the HTTP API and the SSE stream                                   | Playwright's request API |
+| `drivers/controls/` | calls to the `test-controls` endpoints                                           | Playwright's request API |
 
 No driver imports another; enforced by `acceptance/.dependency-cruiser.cjs`.
 Every case runs in the Playwright projects `ui` and `api`; a case limited to one carries that project's tag with the reason beside it.
@@ -103,12 +103,12 @@ Each worker starts its own server with `mise run launch` on port 0 and its own S
 
 ## Tests
 
-| Layer | Where | Tool |
-| --- | --- | --- |
-| Domain rules of a core | the core's own tests | `cargo-nextest`, `proptest` |
-| A port's contract | one shared suite per port, run against every adapter | `cargo-nextest` |
-| `game` | `game`'s tests with the fakes and the recording `Fanout` | `cargo-nextest` |
-| Reducer, hook, presentational components | beside the code in `spa/` | Vitest, Testing Library |
-| The whole app through its public interface | `acceptance/` | Playwright |
+| Layer                                      | Where                                                    | Tool                        |
+| ------------------------------------------ | -------------------------------------------------------- | --------------------------- |
+| Domain rules of a core                     | the core's own tests                                     | `cargo-nextest`, `proptest` |
+| A port's contract                          | one shared suite per port, run against every adapter     | `cargo-nextest`             |
+| `game`                                     | `game`'s tests with the fakes and the recording `Fanout` | `cargo-nextest`             |
+| Reducer, hook, presentational components   | beside the code in `spa/`                                | Vitest, Testing Library     |
+| The whole app through its public interface | `acceptance/`                                            | Playwright                  |
 
 Fakes are hand-written; there is no `mockall` and no module mocking.

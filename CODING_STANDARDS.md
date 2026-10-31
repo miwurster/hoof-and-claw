@@ -1,6 +1,6 @@
 # Coding standards
 
-This repo's own code rules, on top of the Kipu baseline the `kipu-code-review` lenses carry.
+This repo's own code rules, on top of the code review baseline.
 A rule here wins over a lens default on the same concern.
 Where a rule needs a concrete crate, package or module, `ARCHITECTURE.md` owns it.
 What the compiler, Clippy, Oxlint, anti-slop, Stylelint or cargo-deny already enforce is configured there and not repeated here.
