@@ -6,7 +6,7 @@ module.exports = {
       name: "cases-speak-only-the-dsl",
       comment: "A test case imports only from dsl/, so it reads in glossary terms.",
       severity: "error",
-      from: { path: "^(cases|performance)/" },
+      from: { path: "^(cases|performance|smoke)/" },
       to: { pathNot: "^dsl/" },
     },
     {
@@ -14,7 +14,7 @@ module.exports = {
       comment: "The DSL knows the driver interface in dsl/drivers.ts, never a driver.",
       severity: "error",
       from: { path: "^dsl/" },
-      to: { path: "^(drivers|cases|performance)/" },
+      to: { path: "^(drivers|cases|performance|smoke)/" },
     },
     {
       name: "no-driver-imports-another",

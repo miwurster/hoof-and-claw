@@ -104,6 +104,7 @@ A Playwright Test package in Dave Farley's four layers, one folder each:
 | ------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `cases/`            | test cases in glossary terms                                                     | `dsl/`                                             |
 | `performance/`      | performance cases with their budgets (ADR 0015)                                  | `dsl/`                                             |
+| `smoke/`            | the checks against the deployed service, without control channels (ADR 0013)    | `dsl/`                                             |
 | `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface                               |
 | `drivers/ui/`       | the driver for the SPA in a browser                                              | Playwright                                         |
 | `drivers/api/`      | the driver for the HTTP API and the SSE stream                                   | Playwright's request API, `contract/`              |
@@ -113,6 +114,7 @@ No driver imports another; enforced by `acceptance/.dependency-cruiser.cjs`.
 Every case runs in the Playwright projects `ui` and `api`; a case limited to one carries that project's tag with the reason beside it.
 Each worker starts its own server with `mise run launch` on port 0 and its own SQLite file.
 The performance cases run in the project `performance`, with one worker and only the API driver, after the other projects (ADR 0015).
+The checks in `smoke/` run by hand from `smoke.config.ts`, with no global setup and no local server: `pnpm smoke` in the projects `ui` and `api`, and `pnpm smoke:hold` in the project `hold` with only the API driver.
 
 ## Tests
 
@@ -124,5 +126,6 @@ The performance cases run in the project `performance`, with one worker and only
 | Reducer, hook, presentational components   | beside the code in `spa/`                                | Vitest, Testing Library        |
 | The whole app through its public interface | `acceptance/`                                            | Playwright                     |
 | Performance budgets under load (ADR 0015)  | `acceptance/performance/`, project `performance`         | Playwright, `hdr-histogram-js` |
+| The deployed service, by hand (ADR 0013)   | `acceptance/smoke/`, `smoke.config.ts`                   | Playwright                     |
 
 Fakes are hand-written; there is no `mockall` and no module mocking.

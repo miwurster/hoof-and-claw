@@ -52,6 +52,14 @@ class UiPlayer {
     await (delayed ? expect(label).toBeVisible() : expect(label).toHaveCount(0));
   }
 
+  async expectsAnyPrice(): Promise<void> {
+    await expect(this.price.getByText(/^\$\d{1,3}(?:,\d{3})*\.\d{2}$/u)).toBeVisible();
+  }
+
+  holdsTheStream(): Promise<number> {
+    return Promise.reject(new Error("the page reconnects its stream by itself; hold the stream through the API"));
+  }
+
   async expectsScore(score: number): Promise<void> {
     const text = score < 0 ? `Score −${String(-score)}` : `Score ${String(score)}`;
 

@@ -18,6 +18,15 @@ export class Server {
           testControls: true,
         });
       },
+      /** Reports the released commit as its build, without test controls, as the deployed service does. */
+      reportTheReleasedBuild: async (): Promise<void> => {
+        const health = await driver.health();
+
+        expect(health, `the server should report the released build ${build} without test controls`).toEqual({
+          build,
+          testControls: false,
+        });
+      },
       findNothingAtAMissingGameRoute: async (): Promise<void> => {
         const missing = await driver.missingGameRoute();
 
