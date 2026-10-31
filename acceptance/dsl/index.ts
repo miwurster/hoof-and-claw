@@ -135,7 +135,7 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     await use(new Clock(controls));
   },
 
-  server: async ({ drivers, serverProcess, browser, playwright }, use) => {
+  server: async ({ drivers, serverProcess, browser, playwright, controls, priceSource }, use) => {
     const driver = await drivers.server({
       baseURL: serverProcess.baseURL,
       browser,
@@ -143,7 +143,15 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
       network: freshNetwork(),
     });
 
-    await use(new Server(driver, serverProcess.build));
+    const server = new Server(driver, serverProcess.build, { process: serverProcess, controls, priceSource });
+
+    await use(server);
+
+    // The next test needs the worker's server, even when this one stopped it and failed.
+    if (!serverProcess.isRunning()) {
+      await server.startsAgain();
+    }
+
     await driver.close();
   },
 

@@ -1,0 +1,110 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, player_id, direction, placed_at, start_price_cents, start_received_at, start_source,\n                 start_trade_id\n             FROM guesses WHERE state = 'open'",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "player_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "player_id"
+          }
+        }
+      },
+      {
+        "name": "direction",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "name": "placed_at",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "name": "start_price_cents",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_price_cents"
+          }
+        }
+      },
+      {
+        "name": "start_received_at",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_received_at"
+          }
+        }
+      },
+      {
+        "name": "start_source",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_source"
+          }
+        }
+      },
+      {
+        "name": "start_trade_id",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_trade_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "c7cb4f42e67f8971393d0b3de960923715331b078e3c7bd2a681b449f55957de"
+}

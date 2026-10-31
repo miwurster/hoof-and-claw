@@ -34,6 +34,10 @@ pub(crate) struct Configuration {
     #[arg(long, env = "SSE_KEEPALIVE_SECS", default_value_t = 15)]
     pub(crate) sse_keepalive_secs: u64,
 
+    /// How long the server waits on `SIGTERM` for running requests and a running save before it exits, in seconds.
+    #[arg(long, env = "SHUTDOWN_DRAIN_SECS", default_value_t = 20)]
+    pub(crate) shutdown_drain_secs: u64,
+
     /// How often a heartbeat goes to Bitstamp, in seconds.
     #[arg(long, env = "PRICE_HEARTBEAT_INTERVAL_SECS", default_value_t = 10)]
     pub(crate) price_heartbeat_interval_secs: u64,

@@ -33,6 +33,11 @@ export class Player {
     await this.driver.opensTheGame();
   }
 
+  /** Opens the game in another tab of the same browser; the answer is the Player acting in that tab. */
+  async opensAnotherTab(): Promise<Player> {
+    return new Player(`${this.name}'s other tab`, await this.driver.opensAnotherTab());
+  }
+
   /** Closes the game, so no page of it is open, as when the Player closes the browser. */
   async closesTheGame(): Promise<void> {
     await this.driver.closesTheGame();

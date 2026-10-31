@@ -45,7 +45,7 @@ impl Default for Broadcast {
 impl Fanout for Broadcast {
     fn publish_price(&self, latest: LatestPrice) {
         self.price.send_if_modified(|delivery| {
-            if *delivery == Delivery::Closed {
+            if matches!(delivery, Delivery::Closed(_)) {
                 return false;
             }
             *delivery = Delivery::Price(latest);
@@ -81,7 +81,9 @@ impl Fanout for Broadcast {
     fn close(&self) {
         let mut registry = self.registry();
         registry.closed = true;
+        // The slot closes first, so a stream that sees its queue of Player events end knows the fanout closed.
+        self.price
+            .send_modify(|delivery| *delivery = Delivery::Closed(delivery.latest()));
         registry.streams.clear();
-        self.price.send_replace(Delivery::Closed);
     }
 }

@@ -214,6 +214,36 @@ impl Store for Database {
         Ok(saved)
     }
 
+    async fn open_guesses(&self) -> Result<Vec<OpenGuess>, StoreError> {
+        let rows = sqlx::query!(
+            "SELECT id, player_id, direction, placed_at, start_price_cents, start_received_at, start_source,
+                 start_trade_id
+             FROM guesses WHERE state = 'open'",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(unavailable)?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(OpenGuess {
+                    id: guess_id(&row.id)?,
+                    player: row
+                        .player_id
+                        .parse::<PlayerId>()
+                        .map_err(|_| corrupt(format!("the Player ID {:?}", row.player_id)))?,
+                    direction: direction(&row.direction)?,
+                    start: received(
+                        row.start_price_cents,
+                        &row.start_source,
+                        row.start_trade_id,
+                        row.start_received_at,
+                    )?,
+                    placed_at: timestamp(row.placed_at)?,
+                })
+            })
+            .collect()
+    }
+
     async fn standing(&self, player: PlayerId) -> Result<Standing, StoreError> {
         let id = player.to_string();
         let mut connection = self.pool.acquire().await.map_err(unavailable)?;

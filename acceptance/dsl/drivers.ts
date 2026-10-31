@@ -29,6 +29,8 @@ export type Standing = "Correct" | "Wrong" | "Unchanged";
 export type PlayerDriver = {
   readonly opensAnUnknownPage: () => Promise<void>;
   readonly opensTheGame: () => Promise<void>;
+  /** Opens the game in one more tab with the same identity, which the answered driver acts in. */
+  readonly opensAnotherTab: () => Promise<PlayerDriver>;
   /** Closes every page or stream of the game, so the Player has none open. */
   readonly closesTheGame: () => Promise<void>;
   readonly expectsTheGame: () => Promise<void>;

@@ -1,8 +1,13 @@
 // What the API driver shares: decoding the contract's bodies and events, and reading the stream.
+import { setTimeout as delay } from "node:timers/promises";
+
 import type { APIResponse } from "@playwright/test";
 import type { Direction, OpenGuess, Outcome, ResolvedGuess, ServerEvent } from "contract";
 
 export const FORWARDED_FOR = "X-Forwarded-For";
+
+/** How long the driver waits before it opens a stream again that the server ended, about as long as the page waits. */
+const RECONNECT_MS = 250;
 
 /** What the Player's stream and answers have shown so far. */
 export type View = {
@@ -40,6 +45,18 @@ export function cents(price: string): number {
 
 export function wire(direction: "Up" | "Down"): Direction {
   return direction === "Up" ? "up" : "down";
+}
+
+/** A command to place a Guess that also carries a price and a time of the Player's choosing. */
+export function forgedGuess(direction: "Up" | "Down") {
+  return {
+    direction: wire(direction),
+    price: 100,
+    startPrice: 100,
+    time: "2020-01-01T00:00:00Z",
+    placedAt: "2020-01-01T00:00:00Z",
+    remainingMs: 1,
+  };
 }
 
 export function outcome(shown: "Correct" | "Wrong"): Outcome {
@@ -103,6 +120,41 @@ export async function read(body: ReadableStream<Uint8Array>, onEvent: (event: Se
       }
 
       end = buffer.indexOf("\n\n");
+    }
+  }
+}
+
+/**
+ * Reads the stream's events, and once the server ends or loses it, opens a new one as the page does, until `signal`
+ * aborts; the new stream's snapshot rebuilds the view (ADR 0010).
+ */
+export async function follow(
+  body: ReadableStream<Uint8Array>,
+  reopen: (signal: AbortSignal) => Promise<Response>,
+  signal: AbortSignal,
+  onEvent: (event: ServerEvent) => void,
+): Promise<void> {
+  let current: ReadableStream<Uint8Array> | null = body;
+
+  while (!signal.aborted) {
+    if (current !== null) {
+      try {
+        await read(current, onEvent);
+      } catch {
+        // A stream the server lost reconnects as one it ended does.
+      }
+    }
+
+    current = null;
+
+    try {
+      await delay(RECONNECT_MS, undefined, { signal });
+
+      const response = await reopen(signal);
+
+      current = response.status === 200 ? response.body : null;
+    } catch {
+      // The server is not back yet, or the Player closed the game.
     }
   }
 }

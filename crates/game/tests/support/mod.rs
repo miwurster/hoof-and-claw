@@ -36,6 +36,10 @@ impl guessing::Store for Stores {
         self.guesses.resolve(resolved).await
     }
 
+    async fn open_guesses(&self) -> Result<Vec<guessing::OpenGuess>, guessing::StoreError> {
+        self.guesses.open_guesses().await
+    }
+
     async fn standing(
         &self,
         player: guessing::PlayerId,

@@ -59,38 +59,67 @@ pub trait Fanout: Clone + Send + Sync + 'static {
 pub struct Subscription {
     price: watch::Receiver<Delivery>,
     player: Option<mpsc::Receiver<PlayerEvent>>,
+    /// The price this stream has shown: the one it subscribed at, or the last one it was given.
+    seen: LatestPrice,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Delivery {
     Price(LatestPrice),
-    Closed,
+    /// Closed, with the last price published before, which a stream that has not shown it gets before it ends.
+    Closed(LatestPrice),
+}
+
+impl Delivery {
+    const fn latest(self) -> LatestPrice {
+        match self {
+            Self::Price(latest) | Self::Closed(latest) => latest,
+        }
+    }
 }
 
 impl Subscription {
     fn new(price: watch::Receiver<Delivery>, player: Option<mpsc::Receiver<PlayerEvent>>) -> Self {
-        Self { price, player }
+        let seen = price.borrow().latest();
+        Self {
+            price,
+            player,
+            seen,
+        }
     }
 
     /// Waits for the next event, or `None` once the stream has been closed.
     ///
-    /// A Player event that is waiting goes before the price.
+    /// A Player event that is waiting goes before the price. A stream closed before it showed the last price, such as
+    /// Price delayed on shutdown, gets that price before it ends.
     pub async fn next(&mut self) -> Option<Event> {
-        if *self.price.borrow() == Delivery::Closed {
-            return None;
-        }
-        let price = match &mut self.player {
-            Some(player) => tokio::select! {
-                biased;
-                event = player.recv() => return event.map(Event::Player),
-                changed = self.price.changed() => changed,
-            },
-            None => self.price.changed().await,
-        };
-        price.ok()?;
-        match *self.price.borrow_and_update() {
-            Delivery::Price(latest) => Some(Event::Price(latest)),
-            Delivery::Closed => None,
+        loop {
+            if let Delivery::Closed(last) = *self.price.borrow() {
+                if last == self.seen {
+                    return None;
+                }
+                self.seen = last;
+                return Some(Event::Price(last));
+            }
+            let price = match &mut self.player {
+                Some(player) => tokio::select! {
+                    biased;
+                    event = player.recv() => match event {
+                        Some(event) => return Some(Event::Player(event)),
+                        // A closed queue ends the stream, unless the whole fanout closed and the last price is due.
+                        None if matches!(*self.price.borrow(), Delivery::Closed(_)) => continue,
+                        None => return None,
+                    },
+                    changed = self.price.changed() => changed,
+                },
+                None => self.price.changed().await,
+            };
+            price.ok()?;
+            // A closed slot is read at the top of the loop.
+            if let Delivery::Price(latest) = *self.price.borrow_and_update() {
+                self.seen = latest;
+                return Some(Event::Price(latest));
+            }
         }
     }
 }

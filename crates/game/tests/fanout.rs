@@ -29,6 +29,11 @@ macro_rules! shared_suite {
             }
 
             #[tokio::test]
+            async fn a_price_published_just_before_closing_reaches_every_subscription_before_it_ends() {
+                suite::a_price_published_just_before_closing_reaches_every_subscription_before_it_ends($new).await;
+            }
+
+            #[tokio::test]
             async fn a_players_event_reaches_every_stream_of_that_player_and_no_other() {
                 suite::a_players_event_reaches_every_stream_of_that_player_and_no_other($new).await;
             }

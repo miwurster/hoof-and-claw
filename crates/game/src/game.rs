@@ -8,6 +8,7 @@ use guessing::{
 use identity::{Token, TokenHash};
 use jiff::Timestamp;
 use prices::{LatestPrice, PriceSource, ReceivedPrice, Report, Source};
+use tokio::sync::watch;
 use tokio::time::Instant;
 
 use crate::{Clock, Fanout, PlayerEvent, Subscription};
@@ -36,6 +37,8 @@ pub struct Game<C, F, S> {
     /// The Player ID that the first Guess of a visitor with an open stream will take, so that stream gets the
     /// Player's events from that Guess on.
     visitors: Arc<Mutex<HashMap<TokenHash, PlayerId>>>,
+    /// Whether the server is shutting down, which stops `run` at its next report.
+    shutting_down: Arc<watch::Sender<bool>>,
 }
 
 /// An Open guess with the time it has left by the server's clock.
@@ -110,7 +113,27 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
             prices: Arc::default(),
             due: Arc::default(),
             visitors: Arc::default(),
+            shutting_down: Arc::new(watch::Sender::new(false)),
         }
+    }
+
+    /// Puts every Open guess in the store into the index of due guesses, so a Guess placed before a restart resolves
+    /// on the first changed price received after it; run once at start-up, before the first price, and answer how
+    /// many there are.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the store is unavailable.
+    pub async fn rebuild_due_guesses(&self) -> Result<usize, Unavailable> {
+        let open = guessing::Store::open_guesses(&self.store)
+            .await
+            .map_err(|error| Unavailable(Box::new(error)))?;
+        let count = open.len();
+        let mut due = self.due_guesses();
+        for guess in open {
+            due.add(guess);
+        }
+        Ok(count)
     }
 
     /// Takes in every report of the Price source until it ends, and publishes the price as it changes.
@@ -118,12 +141,17 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     /// A changed price goes out at once after a quiet second; a later change within the same second goes out when the
     /// second ends, with the newest price. A change between live and Price delayed goes out at once.
     /// The throttle runs on `tokio`'s real time, not on the `Clock` (ADR 0011).
+    ///
+    /// Returns once the game shuts down, after the save of any resolution it is running.
     pub async fn run(&self, mut source: impl PriceSource) {
         let mut last_price_sent: Option<Instant> = None;
         let mut pending = false;
+        let mut shutting_down = self.shutting_down.subscribe();
         loop {
             let due = last_price_sent.map_or_else(Instant::now, |sent| sent + PRICE_INTERVAL);
             tokio::select! {
+                biased;
+                _ = async { shutting_down.wait_for(|shutting_down| *shutting_down).await.is_ok() } => return,
                 report = source.next() => {
                     let Some(report) = report else { return };
                     if let Report::Received(price, trade_id) = report {
@@ -272,6 +300,15 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     /// Opens the events of one stream: every price, and the Player's own events.
     pub fn subscribe(&self, player: Option<PlayerId>) -> Subscription {
         self.fanout.subscribe(player)
+    }
+
+    /// Starts shutting down: publishes Price delayed, which refuses every Guess from now on with `PriceDelayed`, and
+    /// stops `run` once the save of any resolution it is running is done (ADR 0010).
+    pub fn shut_down(&self) {
+        self.shutting_down.send_replace(true);
+        let mut prices = self.lock();
+        prices.latest.apply(Report::Delayed);
+        self.publish(&mut prices);
     }
 
     /// Ends every open stream, so the server can shut down.

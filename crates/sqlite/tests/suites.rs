@@ -32,6 +32,7 @@ mod guessing_store {
         after_a_resolution_the_player_can_place_the_next_guess,
         the_last_resolved_guess_is_the_most_recent_one,
         resolutions_saved_together_move_each_players_own_score,
+        the_open_guesses_are_every_players_open_guess_and_no_resolved_one,
     );
 }
 
