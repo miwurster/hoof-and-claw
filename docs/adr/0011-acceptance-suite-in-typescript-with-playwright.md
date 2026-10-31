@@ -125,4 +125,6 @@ The rules of the brief form the first set: the visible Score and price, one gues
 - ADR 0008's `acceptance` crate becomes the TypeScript package `acceptance/`, and `test-controls` gains the command to set the clock.
 - The API driver depends on the API contract between frontend and server, which is not yet specified.
 - The gate tests only Chromium, so it does not catch bugs that only Firefox or Safari show.
-- `docs/agents/verification.md` drives the app through the same drivers and control channels.
+- `docs/agents/verification.md` drives the app through the same control channels, and runs a covered criterion's test case alone.
+  It drives an uncovered criterion with `curl` and a browser rather than the DSL, because verification writes nothing to the repo.
+- The worker fixture and `docs/agents/verification.md` start the server with the same task, `mise run launch`.

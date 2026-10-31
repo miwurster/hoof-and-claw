@@ -74,6 +74,7 @@ If the server dies between the two, a link without a Player is left, and it read
 All three run in the Green gate.
 
 - **The crate graph.** One architecture test reads `cargo metadata` and checks each crate's dependencies against the "May depend on" column above, failing with a message that names the crate, the forbidden dependency and the rule.
+  It lives in `crates/server/tests/architecture.rs`, because `server` already depends on every crate, and it also fails on a module named `models`, `services`, `repositories`, `utils` or `helpers`.
 - **cargo-deny `wrappers`.** Only the crates named above may depend directly on `tokio`, `sqlx`, `axum`, `tower-http` and `tokio-tungstenite`.
 - **Clippy.** `disallowed-methods` allows `SystemTime::now` and `Instant::now` only in the system clock adapter, and `disallowed-types` forbids `f32` and `f64` in the cores.
 
