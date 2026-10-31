@@ -7,7 +7,7 @@ A game where players guess whether the BTC/USD price will be higher or lower aft
 ### Guessing
 
 **Player**:
-A person playing the game, known by an anonymous identity rather than an account.
+A person playing the game, with one Score and at most one Open guess.
 _Avoid_: User, account
 
 **Guess**:
