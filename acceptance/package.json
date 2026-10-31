@@ -6,7 +6,9 @@
     "test": "playwright test --project ui --project api",
     "perf": "playwright test --project performance --pass-with-no-tests",
     "typecheck": "tsc --noEmit",
-    "depcruise": "depcruise cases performance dsl drivers --config .dependency-cruiser.cjs"
+    "depcruise": "depcruise cases performance smoke dsl drivers --config .dependency-cruiser.cjs",
+    "smoke": "playwright test --config smoke.config.ts --project ui --project api",
+    "smoke:hold": "playwright test --config smoke.config.ts --project hold"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1",

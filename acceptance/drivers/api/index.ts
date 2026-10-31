@@ -138,6 +138,28 @@ class ApiPlayer {
     await expect.poll(() => this.view.delayed).toBe(delayed);
   }
 
+  async expectsAnyPrice(): Promise<void> {
+    await expect.poll(() => this.view.price, "the stream should show a price").not.toBeNull();
+  }
+
+  /** Waits until the stream ends or `milliseconds` pass, and answers how long it stayed open after its snapshot. */
+  async holdsTheStream(milliseconds: number): Promise<number> {
+    await this.streamOpened();
+
+    const opened = Date.now();
+    const ended = this.reading.at(-1) ?? Promise.resolve();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const held = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, milliseconds);
+    });
+
+    await Promise.race([ended, held]);
+    clearTimeout(timer);
+
+    return Date.now() - opened;
+  }
+
   async expectsScore(score: number): Promise<void> {
     await this.streamOpened();
     expect(this.view.score).toBe(score);

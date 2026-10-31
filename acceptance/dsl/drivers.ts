@@ -18,6 +18,10 @@ export type PlayerDriver = {
   readonly expectsTheGame: () => Promise<void>;
   readonly expectsPrice: (price: string | null) => Promise<void>;
   readonly expectsPriceDelayed: (delayed: boolean) => Promise<void>;
+  /** Some price, whichever it is: the deployed service shows Bitstamp's. */
+  readonly expectsAnyPrice: () => Promise<void>;
+  /** The stream stays open for this long without the server closing it; resolves early with how long it lasted. */
+  readonly holdsTheStream: (milliseconds: number) => Promise<number>;
   readonly expectsScore: (score: number) => Promise<void>;
   readonly expectsNoOpenGuess: () => Promise<void>;
   readonly expectsGuessing: (possible: boolean) => Promise<void>;
