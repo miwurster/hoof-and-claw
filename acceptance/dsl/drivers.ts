@@ -33,6 +33,10 @@ export type PlayerDriver = {
   readonly opensAnotherTab: () => Promise<PlayerDriver>;
   /** Closes every page or stream of the game, so the Player has none open. */
   readonly closesTheGame: () => Promise<void>;
+  /** Opens one more stream of the game, and answers the error code it was refused with, or `null`. */
+  readonly triesToOpenTheGame: () => Promise<string | null>;
+  readonly losesTheNetwork: () => Promise<void>;
+  readonly regainsTheNetwork: () => Promise<void>;
   readonly expectsTheGame: () => Promise<void>;
   readonly expectsPrice: (price: string | null) => Promise<void>;
   readonly expectsPriceDelayed: (delayed: boolean) => Promise<void>;

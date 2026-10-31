@@ -45,4 +45,12 @@ export class WithoutAPage {
   expectsHornFocusRing(): Promise<void> {
     return Promise.reject(new Error("the API has no focus ring"));
   }
+
+  losesTheNetwork(): Promise<void> {
+    return Promise.reject(new Error("the API driver has no network to lose; the page reconnects, not the API"));
+  }
+
+  regainsTheNetwork(): Promise<void> {
+    return Promise.reject(new Error("the API driver has no network to lose; the page reconnects, not the API"));
+  }
 }

@@ -207,3 +207,15 @@ test("an answer that arrives after its Guess resolved does not open it again", (
   expect(state.lastResolved).toEqual(resolved);
   expect(state.placing).toBe(false);
 });
+
+test("a lost stream keeps the last price, the Score and the Open guess, delayed, and allows no Guess", () => {
+  const state = run(received({ ...snapshot, score: 2 }), received({ type: "guessPlaced", guess }), {
+    type: "streamLost",
+  });
+
+  expect(state.price).toBe(6_400_000);
+  expect(state.delayed).toBe(true);
+  expect(state.score).toBe(2);
+  expect(state.openGuess).toEqual({ guess, dueAt: 60_000 });
+  expect(canGuess(state)).toBe(false);
+});

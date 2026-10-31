@@ -18,6 +18,10 @@ export class WithoutTheApi {
     return Promise.reject(new Error("the page always sends JSON"));
   }
 
+  triesToOpenTheGame(): Promise<null> {
+    return Promise.reject(new Error("a page holds one stream; only the API can open more"));
+  }
+
   holdsTheStream(): Promise<number> {
     return Promise.reject(new Error("the page reconnects its stream by itself; hold the stream through the API"));
   }

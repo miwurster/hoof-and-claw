@@ -3,20 +3,10 @@ import { expect } from "@playwright/test";
 import type { APIRequest, APIRequestContext, APIResponse, Browser } from "@playwright/test";
 import type { ErrorBody, ErrorCode, OpenGuess, PlaceGuess } from "contract";
 
-import {
-  apply,
-  cents,
-  decode,
-  follow,
-  forgedGuess,
-  FORWARDED_FOR,
-  heldOpen,
-  outcome,
-  shownResult,
-  wire,
-} from "./stream";
+import { apply, cents, decode, forgedGuess, FORWARDED_FOR, outcome, shownResult, wire } from "./stream";
 import type { View } from "./stream";
 import { expectIdentityCookie, issued, setCookies } from "./identity";
+import { Streams } from "./streams";
 import { WithoutAPage } from "./without-a-page";
 
 export { measuredApiPlayer } from "./measured";
@@ -35,9 +25,7 @@ type Connection = {
 /** A Player's HTTP client with its own identity cookie and streams, from its own network. */
 class ApiPlayer extends WithoutAPage {
   private readonly view: View = { price: null, delayed: true, score: 0, openGuess: null, lastResolved: null };
-  private streams = new AbortController();
-  private reading: Promise<void>[] = [];
-  private snapshots = 0;
+  private readonly streams: Streams;
   private lastPage: APIResponse | undefined;
   private identity: string | undefined;
   private refusal: ErrorCode | undefined;
@@ -53,6 +41,16 @@ class ApiPlayer extends WithoutAPage {
   ) {
     super();
     this.identity = firstTab?.identity;
+    this.streams = new Streams(
+      new URL("/api/events", baseURL),
+      () => this.headers(),
+      (response) => {
+        this.identity = issued(response.headers.getSetCookie(), this.identity);
+      },
+      (event) => {
+        apply(this.view, event);
+      },
+    );
   }
 
   /** Opens the game in a further tab with the same identity, which keeps a view of its own. */
@@ -81,31 +79,26 @@ class ApiPlayer extends WithoutAPage {
   }
 
   async opensTheGame(): Promise<void> {
-    const opened = this.snapshots;
+    const opened = this.streams.snapshotCount;
 
-    const response = await fetch(new URL("/api/events", this.baseURL), {
-      headers: this.headers(),
-      signal: this.streams.signal,
-    });
+    const response = await this.streams.open();
 
     expect(response.status, "the stream should open").toBe(200);
-
-    this.identity = issued(response.headers.getSetCookie(), this.identity);
-
-    if (response.body !== null) {
-      this.reading.push(this.follow(response.body));
-    }
-
-    await expect.poll(() => this.snapshots, "the stream should open with a snapshot").toBeGreaterThan(opened);
+    await expect
+      .poll(() => this.streams.snapshotCount, "the stream should open with a snapshot")
+      .toBeGreaterThan(opened);
   }
 
   /** Ends every stream the Player holds open. */
   async closesTheGame(): Promise<void> {
-    this.streams.abort();
-    await Promise.all(this.reading);
-    this.streams = new AbortController();
-    this.reading = [];
-    this.snapshots = 0;
+    await this.streams.close();
+  }
+
+  /** Opens one more stream; the answer is the error code it was refused with, or `null` when it opened. */
+  async triesToOpenTheGame(): Promise<ErrorCode | null> {
+    const response = await this.streams.open();
+
+    return response.ok ? null : (await decode<ErrorBody>(response)).error;
   }
 
   async guesses(direction: "Up" | "Down"): Promise<void> {
@@ -151,19 +144,17 @@ class ApiPlayer extends WithoutAPage {
   }
 
   /** Waits until the stream ends or `milliseconds` pass, and answers how long it stayed open after its snapshot. */
-  async holdsTheStream(milliseconds: number): Promise<number> {
-    await this.streamOpened();
-
-    return heldOpen(this.reading.at(-1) ?? Promise.resolve(), milliseconds);
+  holdsTheStream(milliseconds: number): Promise<number> {
+    return this.streams.held(milliseconds);
   }
 
   async expectsScore(score: number): Promise<void> {
-    await this.streamOpened();
+    await this.streams.opened();
     await expect.poll(() => this.view.score, `the Player should have Score ${String(score)}`).toBe(score);
   }
 
   async expectsNoOpenGuess(): Promise<void> {
-    await this.streamOpened();
+    await this.streams.opened();
     expect(this.view.openGuess).toBeNull();
   }
 
@@ -189,7 +180,7 @@ class ApiPlayer extends WithoutAPage {
   }
 
   async expectsNoResult(): Promise<void> {
-    await this.streamOpened();
+    await this.streams.opened();
     expect(
       this.view.openGuess !== null || this.view.lastResolved === null,
       "no result of a Resolved guess should show",
@@ -218,7 +209,7 @@ class ApiPlayer extends WithoutAPage {
   }
 
   async expectsAnIdentity(): Promise<void> {
-    await this.streamOpened();
+    await this.streams.opened();
     expectIdentityCookie(this.identity);
   }
 
@@ -239,8 +230,7 @@ class ApiPlayer extends WithoutAPage {
   }
 
   async close(): Promise<void> {
-    this.streams.abort();
-    await Promise.all([...this.reading, ...this.tabs.map((tab) => tab.close())]);
+    await Promise.all([this.streams.close(), ...this.tabs.map((tab) => tab.close())]);
 
     if (this.firstTab === undefined) {
       await this.request.dispose();
@@ -270,21 +260,6 @@ class ApiPlayer extends WithoutAPage {
     } else {
       this.refusal = (await decode<ErrorBody>(response)).error;
     }
-  }
-
-  private async streamOpened(): Promise<void> {
-    await expect.poll(() => this.snapshots, "the stream should open with a snapshot").toBeGreaterThan(0);
-  }
-
-  /** Follows the stream, and once the server ends or loses it, opens a new one as the page does. */
-  private async follow(body: ReadableStream<Uint8Array>): Promise<void> {
-    const reopen = (signal: AbortSignal) =>
-      fetch(new URL("/api/events", this.baseURL), { headers: this.headers(), signal });
-
-    await follow(body, reopen, this.streams.signal, (event) => {
-      this.snapshots += event.type === "snapshot" ? 1 : 0;
-      apply(this.view, event);
-    });
   }
 }
 

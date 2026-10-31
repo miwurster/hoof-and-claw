@@ -206,10 +206,12 @@ test(
     await priceSource.sends("64,000.00");
     await alice.opensTheGame();
 
+    // Each neighbour leaves again, so the network stays under its cap of 10 open streams.
     for (const neighbour of await neighbours.arrive(10)) {
       await neighbour.opensTheGame();
       await neighbour.guesses("Up");
       await neighbour.should.haveAnOpenGuess("Up", "64,000.00");
+      await neighbour.closesTheGame();
     }
 
     await alice.guesses("Up");
@@ -250,10 +252,12 @@ test(
   async ({ alice, neighbours, priceSource }) => {
     await priceSource.sends("64,000.00");
 
+    // Each neighbour leaves again, so the network stays under its cap of 10 open streams.
     for (const neighbour of await neighbours.arrive(10)) {
       await neighbour.opensTheGame();
       await neighbour.guesses("Up");
       await neighbour.should.haveAnOpenGuess("Up", "64,000.00");
+      await neighbour.closesTheGame();
     }
 
     await alice.opensTheGame();
@@ -271,9 +275,11 @@ test(
   async ({ alice, neighbours }) => {
     await alice.opensTheGame();
 
+    // Each neighbour leaves again, so the network stays under its cap of 10 open streams.
     for (const neighbour of await neighbours.arrive(29)) {
       await neighbour.opensTheGame();
       await neighbour.should.beKnownByThisBrowser();
+      await neighbour.closesTheGame();
     }
 
     const [late] = await neighbours.arrive(1);

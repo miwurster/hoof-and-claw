@@ -6,8 +6,16 @@ import type { Action, GameState } from "./reducer";
 
 /** The part of `EventSource` the hook uses. */
 export type Stream = {
-  addEventListener: (type: "message", listener: (message: MessageEvent<string>) => void) => void;
+  addEventListener: (type: "message" | "error", listener: (message: MessageEvent<string>) => void) => void;
   close: () => void;
+};
+
+/** What the hook needs from the browser for its stream, so a test can stand in for it. */
+export type Browser = {
+  readonly openStream: (url: string) => Stream;
+  /** A random number in [0, 1), as `Math.random` returns. */
+  readonly random: () => number;
+  readonly reload: () => void;
 };
 
 /** The part of `fetch` the hook uses. */
@@ -20,8 +28,31 @@ export type Game = {
   readonly place: (direction: Direction) => Promise<void>;
 };
 
-function openEventSource(url: string): Stream {
-  return new EventSource(url);
+const theBrowser: Browser = {
+  openStream: (url) => new EventSource(url),
+  random: () => Math.random(),
+  reload: () => {
+    globalThis.location.reload();
+  },
+};
+
+/** A stream without any data for this long is dead (ADR 0010). */
+const SILENCE_LIMIT_MS = 45_000;
+
+/** The first reconnect waits up to this long; every further one up to twice as long as the one before. */
+const FIRST_DELAY_MS = 1_000;
+
+/** No reconnect waits longer than this. */
+const LONGEST_DELAY_MS = 30_000;
+
+/**
+ * How long to wait before reconnect number `attempt`, counted from 0 since the last snapshot.
+ * Half the delay is fixed and half random, so the delay grows with every attempt and tabs spread out after a deploy.
+ */
+function reconnectDelay(attempt: number, random: number): number {
+  const ceiling = Math.min(LONGEST_DELAY_MS, FIRST_DELAY_MS * 2 ** attempt);
+
+  return (ceiling / 2) * (1 + random);
 }
 
 function sendFetch(url: string, init: RequestInit): Promise<Response> {
@@ -74,25 +105,104 @@ async function placeGuess(send: Send, now: () => number, direction: Direction): 
     : { type: "guessFailed", error: errorCode(text) };
 }
 
+/**
+ * The page's one stream, which the hook alone reconnects (ADR 0014): on an error, and after 45 s without data, it
+ * closes the stream, shows the price as delayed, and opens a new one after a random, growing delay.
+ * The new stream's snapshot rebuilds the state.
+ */
+class Connection {
+  private stream: Stream | undefined;
+  private silence: ReturnType<typeof setTimeout> | undefined;
+  private reconnect: ReturnType<typeof setTimeout> | undefined;
+  /** Reconnects since the last snapshot. */
+  private attempt = 0;
+  /** The build of the first snapshot: the build of the server that served this page. */
+  private ownBuild: string | undefined;
+
+  constructor(
+    private readonly browser: Browser,
+    private readonly now: () => number,
+    private readonly dispatch: (action: Action) => void,
+  ) {}
+
+  open(): void {
+    this.close();
+
+    const opened = this.browser.openStream("/api/events");
+
+    this.stream = opened;
+    opened.addEventListener("message", (message) => {
+      if (this.stream === opened) {
+        this.listen();
+        this.receive(decode<ServerEvent>(message.data));
+      }
+    });
+    opened.addEventListener("error", () => {
+      if (this.stream === opened) {
+        this.lose();
+      }
+    });
+    this.listen();
+  }
+
+  close(): void {
+    clearTimeout(this.silence);
+    clearTimeout(this.reconnect);
+    this.stream?.close();
+    this.stream = undefined;
+  }
+
+  private lose(): void {
+    this.close();
+    this.dispatch({ type: "streamLost" });
+    this.reconnect = setTimeout(
+      () => {
+        this.open();
+      },
+      reconnectDelay(this.attempt, this.browser.random()),
+    );
+    this.attempt += 1;
+  }
+
+  /** Starts counting the silence anew. */
+  private listen(): void {
+    clearTimeout(this.silence);
+    this.silence = setTimeout(() => {
+      this.lose();
+    }, SILENCE_LIMIT_MS);
+  }
+
+  private receive(event: ServerEvent): void {
+    if (event.type === "snapshot") {
+      this.ownBuild ??= event.build;
+
+      if (event.build !== this.ownBuild) {
+        this.close();
+        this.browser.reload();
+
+        return;
+      }
+
+      this.attempt = 0;
+    }
+
+    this.dispatch({ type: "received", event, at: this.now() });
+  }
+}
+
 /** The game's state, fed by the server's stream for as long as the page shows the game, and placing a Guess. */
-export function useGame(
-  openStream: (url: string) => Stream = openEventSource,
-  send: Send = sendFetch,
-  now: () => number = pageClock,
-): Game {
+export function useGame(browser: Browser = theBrowser, send: Send = sendFetch, now: () => number = pageClock): Game {
   const [state, dispatch] = useReducer(reduce, initialState);
 
   useEffect(() => {
-    const stream = openStream("/api/events");
+    const connection = new Connection(browser, now, dispatch);
 
-    stream.addEventListener("message", (message) => {
-      dispatch({ type: "received", event: decode<ServerEvent>(message.data), at: now() });
-    });
+    connection.open();
 
     return () => {
-      stream.close();
+      connection.close();
     };
-  }, [openStream, now]);
+  }, [browser, now]);
 
   const place = useCallback(
     async (direction: Direction) => {

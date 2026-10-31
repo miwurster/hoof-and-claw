@@ -82,6 +82,10 @@ pub(crate) struct Configuration {
     #[arg(long, env = "CLIENT_IP_FROM_RIGHT", default_value = "1")]
     pub(crate) client_ip_from_right: NonZeroUsize,
 
+    /// How many streams one IP may hold open at once.
+    #[arg(long, env = "MAX_STREAMS_PER_IP", default_value_t = 10)]
+    pub(crate) max_streams_per_ip: usize,
+
     /// The directory holding the built app.
     #[arg(long, env = "APP_DIR", default_value = "spa/dist")]
     pub(crate) app_dir: PathBuf,

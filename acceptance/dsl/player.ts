@@ -22,7 +22,7 @@ export class Player {
     readonly name: string,
     private readonly driver: PlayerDriver,
   ) {
-    this.should = { ...seeing(name, driver), ...resolving(driver), ...acting(driver) };
+    this.should = { ...seeing(name, driver), ...resolving(driver), ...acting(name, driver) };
   }
 
   async opensAnUnknownPage(): Promise<void> {
@@ -82,6 +82,22 @@ export class Player {
 
   async pressesEnter(): Promise<void> {
     await this.driver.pressesEnter();
+  }
+
+  /** Opens the game in `count` tabs at once, all from the same network. */
+  async opensTheGameInTabs(count: number): Promise<void> {
+    for (let tab = 0; tab < count; tab += 1) {
+      await this.driver.opensTheGame();
+    }
+  }
+
+  /** Loses the network, so the page loses its stream, and keeps it lost until `regainsTheNetwork`. */
+  async losesTheNetwork(): Promise<void> {
+    await this.driver.losesTheNetwork();
+  }
+
+  async regainsTheNetwork(): Promise<void> {
+    await this.driver.regainsTheNetwork();
   }
 }
 
@@ -150,7 +166,7 @@ function resolving(driver: PlayerDriver) {
 }
 
 /** What a Player should be able to do, and what the game should know of them. */
-function acting(driver: PlayerDriver) {
+function acting(name: string, driver: PlayerDriver) {
   return {
     beAbleToGuess: async (): Promise<void> => {
       await driver.expectsGuessing(true);
@@ -184,6 +200,12 @@ function acting(driver: PlayerDriver) {
     },
     beToldWhereTheScoreLives: async (): Promise<void> => {
       await driver.expectsWhereTheScoreLives();
+    },
+    /** Is refused one more tab of the game, with an error code such as "rateLimited". */
+    beRefusedAnotherTab: async (refusal: Refusal): Promise<void> => {
+      const answer = await driver.triesToOpenTheGame();
+
+      expect(answer, `${name} should be refused another tab as ${refusal}, but got ${String(answer)}`).toBe(refusal);
     },
   };
 }

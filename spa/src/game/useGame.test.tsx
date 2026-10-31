@@ -1,188 +1,200 @@
 import { act, renderHook } from "@testing-library/react";
-import type { OpenGuess, ServerEvent } from "contract";
-import { expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-import type { Send, Stream } from "./useGame";
+import { fakeBrowser, snapshot } from "./fakeBrowser";
 import { useGame } from "./useGame";
 
-class FakeStream implements Stream {
-  closed = false;
-  private readonly listeners: ((message: MessageEvent<string>) => void)[] = [];
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 
-  constructor(readonly url: string) {}
-
-  addEventListener(_type: "message", listener: (message: MessageEvent<string>) => void): void {
-    this.listeners.push(listener);
-  }
-
-  close(): void {
-    this.closed = true;
-  }
-
-  emit(event: ServerEvent): void {
-    const message = new MessageEvent("message", { data: JSON.stringify(event) });
-
-    for (const listener of this.listeners) {
-      listener(message);
-    }
-  }
-}
-
-function fakeStreams() {
-  const opened: FakeStream[] = [];
-
-  return {
-    opened,
-    open: (url: string) => {
-      const stream = new FakeStream(url);
-
-      opened.push(stream);
-
-      return stream;
-    },
-  };
-}
-
-/** A server that answers every request with one status and body, and records what it was sent. */
-function fakeServer(status: number, body: string) {
-  const requests: { url: string; method: string | undefined; contentType: string | null; body: unknown }[] = [];
-
-  const send: Send = (url, init) => {
-    requests.push({
-      url,
-      method: init.method,
-      contentType: new Headers(init.headers).get("content-type"),
-      body: init.body,
-    });
-
-    return Promise.resolve(new Response(body, { status }));
-  };
-
-  return { requests, send };
-}
-
-/** A server the page cannot reach. */
-const unreachable: Send = () => Promise.reject(new TypeError("Failed to fetch"));
-
-const snapshot: ServerEvent = {
-  type: "snapshot",
-  build: "abc",
-  serverTime: "2027-01-01T00:00:00Z",
-  price: 6_400_000,
-  delayed: false,
-  score: 1,
-  openGuess: null,
-  lastResolved: null,
-};
-
-const guess: OpenGuess = { id: "guess-1", direction: "down", startPrice: 6_400_000, remainingMs: 60_000 };
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 test("the hook opens the game's stream and applies its events", () => {
-  const streams = fakeStreams();
-  const { result } = renderHook(() => useGame(streams.open));
-  const stream = streams.opened.at(-1);
+  const page = fakeBrowser();
+  const { result } = renderHook(() => useGame(page.browser));
 
-  expect(stream?.url).toBe("/api/events");
+  expect(page.latest().url).toBe("/api/events");
 
   act(() => {
-    stream?.emit(snapshot);
-    stream?.emit({ type: "price", price: 6_400_001, delayed: false });
+    page.latest().emit(snapshot());
+    page.latest().emit({ type: "price", price: 6_400_001, delayed: false });
   });
 
   expect(result.current.state).toMatchObject({ price: 6_400_001, delayed: false, score: 1 });
 });
 
 test("the hook closes its stream when the page leaves the game", () => {
-  const streams = fakeStreams();
-  const { unmount } = renderHook(() => useGame(streams.open));
+  const page = fakeBrowser();
+  const { unmount } = renderHook(() => useGame(page.browser));
 
   unmount();
 
-  expect(streams.opened.every((stream) => stream.closed)).toBe(true);
+  expect(page.opened.every((stream) => stream.closed)).toBe(true);
 });
 
-test("placing a Guess sends only its Direction as JSON, and the answer becomes the Open guess", async () => {
-  const streams = fakeStreams();
-  const server = fakeServer(201, JSON.stringify(guess));
-  const { result } = renderHook(() => useGame(streams.open, server.send, () => 5_000));
+test("a lost stream shows the last price as delayed and reconnects after a delay", () => {
+  const page = fakeBrowser();
+  const { result } = renderHook(() => useGame(page.browser));
 
   act(() => {
-    streams.opened.at(-1)?.emit(snapshot);
-  });
-  await act(async () => {
-    await result.current.place("down");
+    page.latest().emit(snapshot());
+    page.latest().fail();
   });
 
-  expect(server.requests).toEqual([
-    { url: "/api/guesses", method: "POST", contentType: "application/json", body: '{"direction":"down"}' },
-  ]);
-  expect(result.current.state.openGuess).toEqual({ guess, dueAt: 65_000 });
-  expect(result.current.state.placing).toBe(false);
+  expect(result.current.state).toMatchObject({ price: 6_400_000, delayed: true, score: 1 });
+  expect(page.opened).toHaveLength(1);
+  expect(page.latest().closed).toBe(true);
+
+  act(() => {
+    vi.advanceTimersByTime(1_000);
+  });
+
+  expect(page.opened).toHaveLength(2);
+
+  act(() => {
+    page.latest().emit({ ...snapshot(), price: 6_500_000, score: 2 });
+  });
+
+  expect(result.current.state).toMatchObject({ price: 6_500_000, delayed: false, score: 2 });
 });
 
-test("Up and Down stay disabled from the press until the answer arrives", async () => {
-  const streams = fakeStreams();
-  let answer: ((response: Response) => void) | undefined;
+test("each reconnect without a snapshot waits a random delay that grows, and a snapshot starts over", () => {
+  const page = fakeBrowser(0);
 
-  const send: Send = () =>
-    new Promise((resolve) => {
-      answer = resolve;
+  const opensAfter = (milliseconds: number) => {
+    const before = page.opened.length;
+
+    act(() => {
+      page.latest().fail();
+      vi.advanceTimersByTime(milliseconds - 1);
     });
+    expect(page.opened, `no reconnect before ${String(milliseconds)} ms`).toHaveLength(before);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(page.opened, `a reconnect after ${String(milliseconds)} ms`).toHaveLength(before + 1);
+  };
 
-  const { result } = renderHook(() => useGame(streams.open, send));
+  renderHook(() => useGame(page.browser));
+
+  opensAfter(500);
+  opensAfter(1_000);
+  opensAfter(2_000);
+  opensAfter(4_000);
+  opensAfter(8_000);
+  opensAfter(15_000);
+  opensAfter(15_000);
 
   act(() => {
-    streams.opened.at(-1)?.emit(snapshot);
+    page.latest().emit(snapshot());
   });
 
-  let placed: Promise<void> = Promise.resolve();
+  opensAfter(500);
+});
+
+test("the random part of the delay spreads reconnects up to twice the shortest delay", () => {
+  const page = fakeBrowser(0.999);
+
+  renderHook(() => useGame(page.browser));
 
   act(() => {
-    placed = result.current.place("up");
+    page.latest().fail();
+    vi.advanceTimersByTime(998);
   });
+  expect(page.opened).toHaveLength(1);
 
-  expect(result.current.state.placing).toBe(true);
-
-  await act(async () => {
-    answer?.(new Response(JSON.stringify(guess), { status: 201 }));
-    await placed;
+  act(() => {
+    vi.advanceTimersByTime(1);
   });
-
-  expect(result.current.state.placing).toBe(false);
+  expect(page.opened).toHaveLength(2);
 });
 
-test("a refused Guess reports the server's error code", async () => {
-  const streams = fakeStreams();
-  const server = fakeServer(429, JSON.stringify({ error: "rateLimited" }));
-  const { result } = renderHook(() => useGame(streams.open, server.send));
+test("a stream without any data for 45 seconds is dead: the hook shows the price delayed and reconnects", () => {
+  const page = fakeBrowser();
+  const { result } = renderHook(() => useGame(page.browser));
 
-  await act(async () => {
-    await result.current.place("up");
+  act(() => {
+    page.latest().emit(snapshot());
+    vi.advanceTimersByTime(44_999);
+    page.latest().emit({ type: "price", price: 6_400_001, delayed: false });
+    vi.advanceTimersByTime(44_999);
   });
 
-  expect(result.current.state.message).toBe("rateLimited");
+  expect(page.latest().closed).toBe(false);
+  expect(result.current.state.delayed).toBe(false);
+
+  act(() => {
+    vi.advanceTimersByTime(1);
+  });
+
+  expect(page.latest().closed).toBe(true);
+  expect(result.current.state).toMatchObject({ price: 6_400_001, delayed: true, score: 1 });
+
+  act(() => {
+    vi.advanceTimersByTime(500);
+  });
+
+  expect(page.opened).toHaveLength(2);
+  expect(page.latest().closed).toBe(false);
 });
 
-test("a Guess that cannot reach the server reports a network error", async () => {
-  const streams = fakeStreams();
-  const { result } = renderHook(() => useGame(streams.open, unreachable));
+test("the hook closes the old stream before it opens a new one", () => {
+  const page = fakeBrowser();
 
-  await act(async () => {
-    await result.current.place("up");
+  renderHook(() => useGame(page.browser));
+
+  act(() => {
+    page.latest().fail();
+    vi.advanceTimersByTime(30_000);
+    vi.advanceTimersByTime(45_000);
+    vi.advanceTimersByTime(30_000);
   });
 
-  expect(result.current.state.message).toBe("failed");
-  expect(result.current.state.placing).toBe(false);
+  expect(page.opened.length).toBeGreaterThanOrEqual(3);
+  expect(page.openedWhileAnotherWasOpen).toEqual([]);
 });
 
-test("an answer that is no error body, such as a proxy's page, counts as a failure", async () => {
-  const streams = fakeStreams();
-  const server = fakeServer(502, "<html>Bad Gateway</html>");
-  const { result } = renderHook(() => useGame(streams.open, server.send));
+test("a closed stream changes nothing, even when it still delivers", () => {
+  const page = fakeBrowser();
+  const { result } = renderHook(() => useGame(page.browser));
+  const old = page.latest();
 
-  await act(async () => {
-    await result.current.place("up");
+  act(() => {
+    old.emit(snapshot());
+    old.fail();
+    vi.advanceTimersByTime(500);
+    page.latest().emit({ ...snapshot(), price: 6_500_000 });
+    old.emit({ type: "price", price: 1, delayed: false });
+    old.fail();
   });
 
-  expect(result.current.state.message).toBe("failed");
+  expect(result.current.state).toMatchObject({ price: 6_500_000, delayed: false, score: 1 });
+  expect(page.opened).toHaveLength(2);
+});
+
+test("when a snapshot's build differs from the page's own build, the page reloads", () => {
+  const page = fakeBrowser();
+
+  renderHook(() => useGame(page.browser));
+
+  act(() => {
+    page.latest().emit(snapshot("abc"));
+    page.latest().fail();
+    vi.advanceTimersByTime(500);
+    page.latest().emit(snapshot("abc"));
+  });
+
+  expect(page.reloads()).toBe(0);
+
+  act(() => {
+    page.latest().fail();
+    vi.advanceTimersByTime(500);
+    page.latest().emit(snapshot("def"));
+  });
+
+  expect(page.reloads()).toBe(1);
+  expect(page.latest().closed).toBe(true);
 });

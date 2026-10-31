@@ -10,6 +10,7 @@ mod event;
 mod guess;
 mod health;
 mod stream;
+mod streams_per_ip;
 
 use std::num::NonZeroU32;
 use std::path::PathBuf;
@@ -34,6 +35,7 @@ pub use health::Health;
 
 use crate::cookie::Cookies;
 use crate::stream::Api;
+use crate::streams_per_ip::StreamsPerIp;
 
 /// Everything the router serves.
 pub struct Config<C, F, S> {
@@ -59,6 +61,8 @@ pub struct Limits {
     pub guess_burst: NonZeroU32,
     pub cookies_per_hour: NonZeroU32,
     pub cookie_burst: NonZeroU32,
+    /// How many streams one IP may hold open at once; the next is refused with `rateLimited`.
+    pub streams_per_ip: usize,
 }
 
 impl Default for Limits {
@@ -68,6 +72,7 @@ impl Default for Limits {
             guess_burst: NonZeroU32::new(10).unwrap_or(NonZeroU32::MIN),
             cookies_per_hour: NonZeroU32::new(30).unwrap_or(NonZeroU32::MIN),
             cookie_burst: NonZeroU32::new(30).unwrap_or(NonZeroU32::MIN),
+            streams_per_ip: 10,
         }
     }
 }
@@ -108,7 +113,7 @@ pub fn router<C: Clock, F: Fanout, S: Store>(config: Config<C, F, S>) -> Router 
         config.limits.cookie_burst,
     );
     let place = post(guess::place::<C, F, S>);
-    let place = match guess_limit(config.client_ip, config.limits) {
+    let place = match guess_limit(config.client_ip.clone(), config.limits) {
         Some(limit) => place.layer(limit),
         None => place,
     };
@@ -121,6 +126,8 @@ pub fn router<C: Clock, F: Fanout, S: Store>(config: Config<C, F, S>) -> Router 
             game: config.game,
             build: config.build,
             keepalive: config.keepalive,
+            streams: StreamsPerIp::new(config.limits.streams_per_ip),
+            client_ip: config.client_ip,
         })
         .layer(middleware::from_fn(error::as_json))
         .layer(middleware::from_fn_with_state(
