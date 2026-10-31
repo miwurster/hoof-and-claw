@@ -1,7 +1,6 @@
 # Architecture
 
 Where code goes in this repository: workspace, crate, package, module, and what may depend on what.
-Read it before you add a crate, package, module, port or adapter, wire the server, or add a component or test layer.
 
 There is no code yet; this file is the target shape, and the first code is written to it.
 Properties of code, how it is written rather than where it lives, are in `CODING_STANDARDS.md`.
@@ -21,6 +20,7 @@ A rule without a test name is convention.
 
 Crates are named after areas of the game, not after technical layers.
 Each area's core is a synchronous crate that takes time and prices as values and returns decisions.
+A pure crate does no I/O, starts no async runtime and reads no clock.
 `game` is the one asynchronous shell that runs the cores; adapters are named after their technology and plug into ports the cores own.
 
 | Crate           | Kind         | Holds                                                                                                                      | May depend on                                    |
