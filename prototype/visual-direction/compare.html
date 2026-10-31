@@ -1,0 +1,44 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throw away.
+  Question: does the proposed Pasture/Rust pair separate Up and Down better than the current one, also with red/green colour blindness?
+  Left column: current colours. Right column: proposed colours. Press V to cycle the colour-vision simulation.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hoof & Claw palette comparison (prototype)</title>
+<style>
+  body { margin: 0; background: #111; color: #ddd; font: 14px/1.4 ui-sans-serif, system-ui, sans-serif; }
+  .grid { display: grid; grid-template-columns: repeat(2, 420px); gap: 16px; justify-content: center; padding: 16px 16px 90px; }
+  h2 { margin: 8px 0 0; font-size: 15px; font-weight: 600; }
+  h2 span { color: #999; font-weight: 400; }
+  iframe { width: 420px; height: 600px; border: 0; border-radius: 8px; display: block; }
+  .proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
+               background: #fff; color: #111; padding: 6px 6px 6px 14px; border-radius: 999px; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+  .proto-bar button { font: inherit; border: 0; background: #eee; border-radius: 999px; height: 30px; padding: 0 12px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<div class="proto-bar"><span id="lbl"></span><button id="sim">Cycle simulation (V)</button></div>
+<script>
+const STATES = ['open', 'correct', 'wrong'];
+const SIMS = ['none', 'deuteranopia', 'protanopia'];
+let sim = SIMS.includes(new URLSearchParams(location.search).get('sim')) ? new URLSearchParams(location.search).get('sim') : 'none';
+function render() {
+  const s = sim === 'none' ? '' : '&sim=' + sim;
+  document.getElementById('grid').innerHTML =
+    '<h2>Current <span>Pasture #7DBB6E, Rust #D9573B</span></h2><h2>Proposed <span>Pasture #A9D79B, Rust #D0533A</span></h2>' +
+    STATES.map(st => ['current', 'proposed'].map(p =>
+      `<iframe src="index.html?logo=B4&state=${st}&palette=${p}&embed=1${s}" title="${p} ${st}"></iframe>`).join('')).join('');
+  document.getElementById('lbl').textContent = 'Simulation: ' + sim;
+  history.replaceState(null, '', sim === 'none' ? '?' : '?sim=' + sim);
+}
+function next() { sim = SIMS[(SIMS.indexOf(sim) + 1) % SIMS.length]; render(); }
+document.getElementById('sim').onclick = next;
+document.addEventListener('keydown', e => { if (e.key === 'v' || e.key === 'V') next(); });
+render();
+</script>
+</body>
+</html>

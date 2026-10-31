@@ -1,0 +1,165 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throw away.
+  Question: which variant of the split mark (logo B) reads best at small sizes, also with red/green colour blindness?
+  Rows are variants; columns are sizes. Press V (or the bar button) to cycle colour-vision simulation.
+  Below 20 px every mark switches to a simplified drawing: wider hoof gap, two heavier claw slashes.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hoof & Claw logo B variants (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --loam: #1C1A16; --turf: #2A2721; --bone: #EDE6D6; --flint: #8F887A;
+    --pasture: #7DBB6E; --rust: #D9573B; --horn: #D4B26A; --edge: #3A362E;
+    /* Luminance-separated pair for the logo only: light green, deep red. */
+    --pasture-hi: #A9D79B; --rust-lo: #A93F27;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--loam); color: var(--bone); }
+  body { font-family: Geist, system-ui, sans-serif; line-height: 1.45; }
+  body.sim-deuteranopia #page { filter: url(#deuteranopia); }
+  body.sim-protanopia #page { filter: url(#protanopia); }
+  body.sim-grayscale #page { filter: grayscale(1); }
+
+  .sheet { max-width: 1060px; margin: 0 auto; padding: 32px 24px 120px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .intro { color: var(--flint); margin: 0 0 24px; max-width: 70ch; }
+  .row { display: grid; grid-template-columns: 200px 1fr 1fr 1.1fr; gap: 24px; align-items: center; padding: 26px 0; border-top: 1px solid var(--edge); }
+  .row h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .row h2 span { display: block; color: var(--flint); font-weight: 400; font-size: 13px; margin-top: 4px; }
+  .cell { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .cell small { color: var(--flint); font-size: 12px; }
+  .wordmark { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 20px; letter-spacing: -0.02em; white-space: nowrap; }
+  .wordmark .amp { color: var(--horn); }
+  .big .wordmark { font-size: 40px; gap: 14px; }
+  .tabs { display: flex; gap: 10px; }
+  .tab { white-space: nowrap; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px 8px 0 0; font-size: 13px; }
+  .tab.dark { background: #35322B; }
+  .tab.light { background: #F1F1F1; color: #222; }
+  .sizes { display: flex; gap: 14px; align-items: end; }
+  .mark { display: block; flex: none; }
+
+  .proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
+               background: #fff; color: #111; padding: 6px 6px 6px 14px; border-radius: 999px; box-shadow: 0 6px 24px rgba(0,0,0,.5);
+               font: 13px/1 ui-sans-serif, system-ui, sans-serif; }
+  .proto-bar button { font: inherit; border: 0; background: #eee; border-radius: 999px; height: 30px; padding: 0 12px; cursor: pointer; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <!-- Machado et al. (2009), severity 1.0 -->
+  <filter id="deuteranopia" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="protanopia" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+</svg>
+<div id="page"></div>
+<div class="proto-bar"><span id="simlabel"></span><button id="sim">Cycle simulation (V)</button></div>
+<script>
+// ---------- Shapes (24 x 24 boxes) ----------
+// Cloven hoof print: two half-heart toes, converging at the front; `gap` widens the cleft.
+const toes = (gap = 1) => `<path d="M${12 - gap} 2.5C7.5 4 4.5 9.5 4.5 15c0 4 2 6.5 4.6 6.5 1.6 0 2.4-1 2.4-2.6V${2.5 + gap}Z" transform="translate(${-gap + 0.5} 0)"/><path d="M${12 + gap} 2.5c4.5 1.5 7.5 7 7.5 12.5 0 4-2 6.5-4.6 6.5-1.6 0-2.4-1-2.4-2.6V${2.5 + gap}Z" transform="translate(${gap - 0.5} 0)"/>`;
+// Claw slashes: tapered lenses along one diagonal.
+const claws = (w = 0.75, offsets = [-4.6, 0, 4.6]) => offsets.map(dx => {
+  const px = 0.894 * w * 2, py = 0.447 * w * 2;
+  return `<path d="M${17 + dx} 2.5Q${12.25 + dx - px} ${12 - py} ${7.5 + dx} 21.5Q${12.25 + dx + px} ${12 + py} ${17 + dx} 2.5Z"/>`;
+}).join('');
+const art = small => ({
+  hoof: small ? toes(1.8) : toes(1),
+  claw: small ? claws(1.5, [-3.2, 3.2]) : claws(0.75),
+});
+let uid = 0;
+const tile = (size, inner) => `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="Hoof & Claw">${inner}</svg>`;
+
+// ---------- Variants ----------
+const VARIANTS = [
+  {
+    key: 'B', name: 'Original split',
+    note: 'Reference. Pasture and Rust have almost the same lightness, so the halves only differ in hue.',
+    mark(size) {
+      const a = art(size < 20), id = 'c' + uid++;
+      return tile(size, `<clipPath id="${id}"><rect width="24" height="24" rx="6"/></clipPath>
+        <g clip-path="url(#${id})"><rect width="12" height="24" fill="var(--pasture)"/><rect x="12" width="12" height="24" fill="var(--rust)"/></g>
+        <g fill="var(--loam)" transform="translate(-0.6 5.4) scale(.55)">${a.hoof}</g>
+        <g fill="var(--loam)" transform="translate(11.4 5.4) scale(.55)">${a.claw}</g>`);
+    },
+  },
+  {
+    key: 'B1', name: 'Light / dark split',
+    note: 'Same idea, but a light green and a deep red, so the halves differ in lightness too. Loam hoof on light, Bone claws on dark.',
+    mark(size) {
+      const a = art(size < 20), id = 'c' + uid++;
+      return tile(size, `<clipPath id="${id}"><rect width="24" height="24" rx="6"/></clipPath>
+        <g clip-path="url(#${id})"><rect width="12" height="24" fill="var(--pasture-hi)"/><rect x="12" width="12" height="24" fill="var(--rust-lo)"/></g>
+        <g fill="var(--loam)" transform="translate(-0.6 5.4) scale(.55)">${a.hoof}</g>
+        <g fill="var(--bone)" transform="translate(11.4 5.4) scale(.55)">${a.claw}</g>`);
+    },
+  },
+  {
+    key: 'B2', name: 'Diagonal split',
+    note: 'The split itself is a claw slash. Light green upper left with the hoof, deep red lower right with the claws. The two halves have different shapes, so colour is optional.',
+    mark(size) {
+      const small = size < 20, a = art(small), id = 'c' + uid++;
+      return tile(size, `<clipPath id="${id}"><rect width="24" height="24" rx="6"/></clipPath>
+        <g clip-path="url(#${id})"><rect width="24" height="24" fill="var(--rust-lo)"/><path d="M0 0H25L-1 25Z" fill="var(--pasture-hi)"/></g>
+        <g fill="var(--loam)" transform="translate(1.2 1.6) scale(${small ? .46 : .4})">${a.hoof}</g>
+        <g fill="var(--bone)" transform="translate(${small ? 11.6 : 12.4} ${small ? 11.6 : 12.4}) scale(${small ? .46 : .4})">${a.claw}</g>`);
+    },
+  },
+  {
+    key: 'B3', name: 'Horn tile',
+    note: 'One colour: a Horn tile with the hoof and claws in Loam, divided by a thin cut. Readable with any colour vision; ties to the Horn ampersand.',
+    mark(size) {
+      const small = size < 20, a = art(small), id = 'c' + uid++;
+      return tile(size, `<rect width="24" height="24" rx="6" fill="var(--horn)"/>
+        <rect x="11.5" y="4" width="1" height="16" rx=".5" fill="var(--loam)" opacity="${small ? 0 : .5}"/>
+        <g fill="var(--loam)" transform="translate(-0.6 5.4) scale(.55)">${a.hoof}</g>
+        <g fill="var(--loam)" transform="translate(11.4 5.4) scale(.55)">${a.claw}</g>`);
+    },
+  },
+  {
+    key: 'B4', name: 'Coloured shapes',
+    note: 'No coloured halves: a Turf tile with a large light-green hoof and Rust claws. Colour lives only in the shapes, which carry the meaning on their own.',
+    mark(size) {
+      const small = size < 20, a = art(small);
+      return tile(size, `<rect width="24" height="24" rx="6" fill="var(--turf)"/>
+        <g fill="var(--pasture-hi)" transform="translate(-0.9 4.6) scale(.6)">${a.hoof}</g>
+        <g fill="var(--rust)" transform="translate(10.6 4.6) scale(.6)">${a.claw}</g>`);
+    },
+  },
+];
+
+// ---------- Render ----------
+const wordmark = (v, size) => `<span class="wordmark">${v.mark(size)}<span>Hoof <span class="amp">&amp;</span> Claw</span></span>`;
+document.getElementById('page').innerHTML = `<div class="sheet">
+  <h1>Split mark variants</h1>
+  <p class="intro">Every row is one variant of logo B. Under 20 px each mark switches to a simplified drawing: a wider cleft in the hoof and two heavier claw slashes instead of three.</p>
+  ${VARIANTS.map(v => `<div class="row">
+    <h2>${v.key}. ${v.name}<span>${v.note}</span></h2>
+    <div class="cell big">${wordmark(v, 56)}<small>Large</small></div>
+    <div class="cell">${wordmark(v, 28)}<small>Header size</small></div>
+    <div class="cell">
+      <div class="tabs"><div class="tab dark">${v.mark(16)}Hoof &amp; Claw</div><div class="tab light">${v.mark(16)}Hoof &amp; Claw</div></div>
+      <div class="sizes">${v.mark(64)}${v.mark(32)}${v.mark(16)}</div>
+      <small>Favicon in a browser tab, and the mark at 64, 32 and 16 px</small>
+    </div></div>`).join('')}
+</div>`;
+
+const SIMS = ['none', 'deuteranopia', 'protanopia', 'grayscale'];
+let sim = SIMS.includes(new URLSearchParams(location.search).get('sim')) ? new URLSearchParams(location.search).get('sim') : 'none';
+function applySim() {
+  document.body.className = sim === 'none' ? '' : 'sim-' + sim;
+  document.getElementById('simlabel').textContent = 'Simulation: ' + sim;
+  history.replaceState(null, '', sim === 'none' ? '?' : '?sim=' + sim);
+}
+function nextSim() { sim = SIMS[(SIMS.indexOf(sim) + 1) % SIMS.length]; applySim(); }
+document.getElementById('sim').onclick = nextSim;
+document.addEventListener('keydown', e => { if (e.key === 'v' || e.key === 'V') nextSim(); });
+applySim();
+</script>
+</body>
+</html>

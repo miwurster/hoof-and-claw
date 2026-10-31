@@ -1,0 +1,374 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throw away.
+  Question: what should the Hoof & Claw logo and game screen look like?
+  Three logo concepts (?logo=A|B|C) on the decided single-column screen, in every guess state (?state=...),
+  plus a logo sheet (?view=sheet) comparing the marks at header and favicon sizes.
+  Keys: left/right cycles logo, up/down cycles state, S toggles the sheet.
+  Clicking Up or Down in the idle state runs a short live simulation (10 s countdown instead of 60 s).
+  Spec: hoof-and-claw/docs/design/visual-direction.md
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hoof & Claw (prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --loam: #1C1A16; --turf: #2A2721; --bone: #EDE6D6; --flint: #8F887A;
+    --pasture: #7DBB6E; --rust: #D9573B; --horn: #D4B26A;
+    --edge: #3A362E;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--loam); color: var(--bone); }
+  body { font-family: Geist, system-ui, sans-serif; font-size: 16px; line-height: 1.45; min-height: 100vh; }
+  .num { font-variant-numeric: tabular-nums; }
+  :focus-visible { outline: 2px solid var(--horn); outline-offset: 3px; }
+
+  /* Game screen */
+  .app { max-width: 420px; margin: 0 auto; padding: 20px 20px 120px; }
+  header { display: flex; align-items: center; justify-content: space-between; height: 48px; }
+  .score { display: flex; align-items: baseline; gap: 8px; color: var(--flint); font-size: 14px; }
+  .score b { color: var(--bone); font-size: 22px; font-weight: 600; display: inline-block; min-width: 1.4ch; text-align: right; }
+  .score b.tick { animation: tick 360ms 220ms both cubic-bezier(.2,.8,.2,1); }
+  @keyframes tick { from { transform: translateY(-40%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .price { text-align: center; margin: 56px 0 40px; }
+  .price .value { font-size: clamp(44px, 13vw, 60px); font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+  .price .pair { color: var(--flint); font-size: 14px; margin-top: 10px; }
+  .price.delayed .value { color: var(--flint); }
+  .price.delayed .pair { color: var(--bone); }
+
+  .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .btn { font: inherit; font-size: 20px; font-weight: 600; height: 64px; border-radius: 14px; border: 0;
+         background: var(--turf); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+         box-shadow: inset 0 0 0 1.5px currentColor; }
+  .btn svg { width: 22px; height: 22px; fill: currentColor; opacity: .9; }
+  .btn.up { color: var(--pasture); }
+  .btn.down { color: var(--rust); }
+  .btn:not(:disabled):hover { background: #332F28; }
+  .btn:not(:disabled):active { transform: translateY(1px); }
+  .btn:disabled { color: var(--flint); box-shadow: inset 0 0 0 1.5px var(--edge); cursor: not-allowed; }
+  .btn:disabled svg { opacity: .5; }
+  .rules { color: var(--flint); font-size: 14px; text-align: center; margin: 14px 0 32px; }
+
+  .card { background: var(--turf); border-radius: 18px; padding: 20px; display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; }
+  .ring { width: 72px; height: 72px; position: relative; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .track { stroke: var(--edge); }
+  .ring .bar { stroke: var(--bone); transition: stroke-dashoffset 1s linear; }
+  .ring .secs { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; font-weight: 600; }
+  .ring.waiting .track { stroke: var(--flint); animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .card .line1 { font-size: 15px; color: var(--flint); }
+  .card .line1 strong { color: var(--bone); font-weight: 600; }
+  .card .diff { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
+  .card .waitmsg { color: var(--bone); margin-top: 4px; }
+
+  .result .stamp { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; box-shadow: inset 0 0 0 2px currentColor; }
+  .result .stamp svg { width: 40px; height: 40px; fill: currentColor; }
+  .result .stamp.land { animation: stamp 320ms cubic-bezier(.3,1.6,.5,1) both; }
+  @keyframes stamp { from { transform: scale(1.7) rotate(-14deg); opacity: 0; } to { transform: rotate(-6deg); opacity: 1; } }
+  .result .stamp { transform: rotate(-6deg); }
+  .result .outcome { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; display: flex; align-items: baseline; gap: 10px; }
+  .result .delta { font-size: 16px; }
+  .result dl { margin: 6px 0 0; display: grid; grid-template-columns: auto auto; justify-content: start; gap: 2px 14px; font-size: 14px; }
+  .result dt { color: var(--flint); }
+  .result dd { margin: 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .result .stamp.land, .score b.tick, .ring.waiting .track { animation: none; }
+    .ring .bar { transition: none; }
+  }
+
+  /* Logos */
+  .wordmark { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 20px; letter-spacing: -0.02em; white-space: nowrap; }
+  .wordmark .amp { color: var(--horn); }
+  .wordmark .toes { height: .64em; width: .66em; fill: var(--bone); margin: 0 .02em; transform: translateY(.04em); }
+  .wordmark .ampsvg { height: 1.05em; width: 1.05em; fill: var(--horn); }
+  .mark { display: block; }
+
+  /* Sheet */
+  .sheet { max-width: 980px; margin: 0 auto; padding: 32px 24px 120px; }
+  .sheet h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+  .sheet p { color: var(--flint); margin: 0 0 28px; }
+  .row { display: grid; grid-template-columns: 140px 1fr 1fr 1fr; gap: 20px; align-items: center; padding: 28px 0; border-top: 1px solid var(--edge); }
+  .row h2 { font-size: 16px; font-weight: 600; margin: 0; }
+  .row h2 span { display: block; color: var(--flint); font-weight: 400; font-size: 13px; }
+  .cell { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .cell small { color: var(--flint); font-size: 12px; }
+  .big .wordmark { font-size: 44px; }
+  .tabs { display: flex; gap: 10px; align-items: center; }
+  .tab { white-space: nowrap; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 8px 8px 0 0; font-size: 13px; }
+  .tab.dark { background: #35322B; color: var(--bone); }
+  .tab.light { background: #F1F1F1; color: #222; }
+
+  body.sim-deuteranopia #root { filter: url(#deuteranopia); }
+  body.sim-protanopia #root { filter: url(#protanopia); }
+  body.embed .proto-bar { display: none; }
+  body.embed .app { padding-bottom: 20px; }
+  /* Prototype switcher (not part of the design) */
+  .proto-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; align-items: center;
+               background: #fff; color: #111; padding: 6px; border-radius: 999px; box-shadow: 0 6px 24px rgba(0,0,0,.5);
+               font: 13px/1 ui-sans-serif, system-ui, sans-serif; z-index: 10; }
+  .proto-bar button { font: inherit; border: 0; background: #eee; border-radius: 999px; height: 30px; min-width: 30px; padding: 0 10px; cursor: pointer; }
+  .proto-bar button:hover { background: #ddd; }
+  .proto-bar .lbl { padding: 0 6px; min-width: 120px; text-align: center; }
+  .proto-bar .sep { width: 1px; height: 20px; background: #ccc; margin: 0 4px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="deuteranopia" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="protanopia" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+</svg>
+<div id="root"></div>
+<div class="proto-bar" id="bar"></div>
+<script>
+// ---------- Shapes (24 x 24 boxes) ----------
+const toes = (gap = 1) => `<path d="M${12 - gap} 2.5C7.5 4 4.5 9.5 4.5 15c0 4 2 6.5 4.6 6.5 1.6 0 2.4-1 2.4-2.6V${2.5 + gap}Z" transform="translate(${-gap + 0.5} 0)"/><path d="M${12 + gap} 2.5c4.5 1.5 7.5 7 7.5 12.5 0 4-2 6.5-4.6 6.5-1.6 0-2.4-1-2.4-2.6V${2.5 + gap}Z" transform="translate(${gap - 0.5} 0)"/>`;
+const HOOF = toes(1);
+const claw = (w = 0.75, offsets = [-4.6, 0, 4.6]) => offsets.map(dx => {
+  const px = 0.894 * w * 2, py = 0.447 * w * 2;
+  return `<path d="M${17 + dx} 2.5Q${12.25 + dx - px} ${12 - py} ${7.5 + dx} 21.5Q${12.25 + dx + px} ${12 + py} ${17 + dx} 2.5Z"/>`;
+}).join('');
+const CLAW = claw();
+const icon = (inner, cls = '') => `<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true">${inner}</svg>`;
+let uid = 0;
+
+// ---------- Logo concepts ----------
+const LOGOS = {
+  A: {
+    name: 'Ampersand mark',
+    // The "&" cut by claw slashes; the "oo" of Hoof drawn as a cloven hoof print.
+    mark(size) {
+      const id = 'm' + (uid++);
+      return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="Hoof & Claw">
+        <mask id="${id}"><rect width="24" height="24" fill="#fff"/><g fill="#000" transform="translate(1 0)">${claw(0.55)}</g></mask>
+        <rect width="24" height="24" rx="6" fill="var(--turf)"/>
+        <text x="12" y="19.5" text-anchor="middle" font-family="Geist, sans-serif" font-weight="800" font-size="22" fill="var(--horn)" mask="url(#${id})">&amp;</text></svg>`;
+    },
+    wordmark() {
+      const id = 'm' + (uid++);
+      return `<span class="wordmark" aria-label="Hoof & Claw" style="gap:0">H<svg class="toes" viewBox="2.5 2 19 20">${toes(1.6)}</svg>f&nbsp;<svg class="ampsvg" viewBox="0 0 24 24">
+        <mask id="${id}"><rect width="24" height="24" fill="#fff"/><g fill="#000" transform="translate(1 0)">${claw(0.45)}</g></mask>
+        <text x="12" y="19" text-anchor="middle" font-family="Geist, sans-serif" font-weight="700" font-size="22" fill="var(--horn)" mask="url(#${id})">&amp;</text></svg>&nbsp;Claw</span>`;
+    },
+  },
+  B: {
+    name: 'Split mark',
+    mark(size) {
+      const id = 'c' + (uid++);
+      return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="Hoof & Claw">
+        <clipPath id="${id}"><rect width="24" height="24" rx="6"/></clipPath>
+        <g clip-path="url(#${id})"><rect width="12" height="24" fill="var(--pasture)"/><rect x="12" width="12" height="24" fill="var(--rust)"/></g>
+        <g fill="var(--loam)" transform="translate(-0.6 5.4) scale(.55)">${HOOF}</g>
+        <g fill="var(--loam)" transform="translate(11.4 5.4) scale(.55)">${CLAW}</g></svg>`;
+    },
+    wordmark() { return `<span class="wordmark">${this.mark(28)}<span>Hoof <span class="amp">&amp;</span> Claw</span></span>`; },
+  },
+  B4: {
+    name: 'Coloured shapes',
+    mark(size) {
+      const small = size < 20;
+      return `<svg class="mark" width="${size}" height="${size}" viewBox="0 0 24 24" aria-label="Hoof & Claw">
+        <rect width="24" height="24" rx="6" fill="var(--turf)"/>
+        <g fill="var(--pasture)" transform="translate(-0.9 4.6) scale(.6)">${small ? toes(1.8) : HOOF}</g>
+        <g fill="var(--rust)" transform="translate(10.6 4.6) scale(.6)">${small ? claw(1.5, [-3.2, 3.2]) : CLAW}</g></svg>`;
+    },
+    wordmark() { return `<span class="wordmark">${this.mark(28)}<span>Hoof <span class="amp">&amp;</span> Claw</span></span>`; },
+  },
+  C: {
+    name: 'Tracks',
+    mark(size, square) {
+      const vb = square ? '10 0 28 28' : '0 0 48 24';
+      const w = square ? size : size * 2;
+      return `<svg class="mark" width="${w}" height="${size}" viewBox="${vb}" aria-label="Hoof & Claw">
+        ${square ? '<rect x="10" width="28" height="28" rx="7" fill="var(--turf)"/>' : ''}
+        <polyline points="2,17 10,14 15,16 25,6 33,13 39,11 46,17" fill="none" stroke="var(--bone)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+        <g fill="var(--pasture)" transform="translate(14.5 0.5) scale(.38)">${HOOF}</g>
+        <g fill="var(--rust)" transform="translate(29.5 14.5) scale(.38)">${CLAW}</g></svg>`;
+    },
+    wordmark() { return `<span class="wordmark">${this.mark(24)}<span>Hoof <span class="amp">&amp;</span> Claw</span></span>`; },
+  },
+};
+
+// ---------- State ----------
+const PALETTES = { current: { pasture: '#7DBB6E', rust: '#D9573B' }, proposed: { pasture: '#A9D79B', rust: '#D0533A' } };
+const P0 = new URLSearchParams(location.search);
+const palette = PALETTES[P0.get('palette')] ? P0.get('palette') : 'current';
+document.documentElement.style.setProperty('--pasture', PALETTES[palette].pasture);
+document.documentElement.style.setProperty('--rust', PALETTES[palette].rust);
+if (P0.get('sim')) document.body.classList.add('sim-' + P0.get('sim'));
+if (P0.get('embed')) document.body.classList.add('embed');
+const STATES = ['idle', 'open', 'waiting', 'correct', 'wrong', 'delayed'];
+const params = new URLSearchParams(location.search);
+let logo = LOGOS[params.get('logo')] ? params.get('logo') : 'A';
+let state = STATES.includes(params.get('state')) ? params.get('state') : 'idle';
+let view = params.get('view') === 'sheet' ? 'sheet' : 'game';
+let sim = null; // live simulation, when running
+let animate = false;
+
+const START = 67412.18;
+const usd = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + usd(Math.abs(n));
+
+function snapshot() {
+  // Fixed data per state, so every state can be reviewed without waiting.
+  switch (state) {
+    case 'idle':    return { score: 3, price: START, dir: null };
+    case 'open':    return { score: 3, price: START + 12.4, dir: 'up', start: START, secs: 37 };
+    case 'waiting': return { score: 3, price: START, dir: 'up', start: START, secs: 0 };
+    case 'correct': return { score: 4, prev: 3, price: START + 18.84, dir: 'up', start: START, end: START + 18.84, outcome: 'Correct' };
+    case 'wrong':   return { score: 2, prev: 3, price: START - 9.61, dir: 'up', start: START, end: START - 9.61, outcome: 'Wrong' };
+    case 'delayed': return { score: 3, price: START, dir: null, delayed: true };
+  }
+}
+
+// ---------- Render ----------
+function ring(secs, waiting) {
+  const C = 2 * Math.PI * 30;
+  const off = waiting ? 0 : C * (1 - secs / 60);
+  return `<div class="ring ${waiting ? 'waiting' : ''}"><svg viewBox="0 0 72 72">
+    <circle class="track" cx="36" cy="36" r="30" fill="none" stroke-width="5"/>
+    ${waiting ? '' : `<circle class="bar" cx="36" cy="36" r="30" fill="none" stroke-width="5" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}"/>`}
+  </svg><div class="secs num">${waiting ? '' : secs}</div></div>`;
+}
+
+function guessCard(d) {
+  if (!d.dir) return '';
+  const dirLabel = d.dir === 'up' ? 'Up ↑' : 'Down ↓';
+  if (d.outcome) {
+    const wentUp = d.end > d.start;
+    const correct = d.outcome === 'Correct';
+    return `<section class="card result" aria-live="polite">
+      <div class="stamp ${animate ? 'land' : ''}" style="color:var(--${wentUp ? 'pasture' : 'rust'})" title="Price went ${wentUp ? 'up' : 'down'}">${icon(wentUp ? HOOF : CLAW)}</div>
+      <div>
+        <div class="outcome">${d.outcome} <span class="delta num" style="color:var(--flint)">${correct ? '+1' : '−1'}</span></div>
+        <dl class="num">
+          <dt>Your guess</dt><dd>${dirLabel}</dd>
+          <dt>Start price</dt><dd>${usd(d.start)}</dd>
+          <dt>End price</dt><dd>${usd(d.end)}</dd>
+        </dl>
+      </div></section>`;
+  }
+  const delta = d.price - d.start;
+  const good = (d.dir === 'up' && delta > 0) || (d.dir === 'down' && delta < 0);
+  const col = delta === 0 ? 'var(--flint)' : good ? 'var(--pasture)' : 'var(--rust)';
+  const arrow = delta > 0 ? ' ↑' : delta < 0 ? ' ↓' : '';
+  const waiting = d.secs === 0;
+  return `<section class="card">
+    ${ring(d.secs, waiting)}
+    <div>
+      <div class="line1">You guessed <strong>${dirLabel}</strong> from <span class="num">${usd(d.start)}</span></div>
+      <div class="diff num" style="color:${col}">${signed(delta)}${arrow}</div>
+      ${waiting ? '<div class="waitmsg">Waiting for the price to move…</div>' : ''}
+    </div></section>`;
+}
+
+function renderGame() {
+  const d = sim ? sim.data : snapshot();
+  const locked = !!d.dir && !d.outcome || d.delayed;
+  const L = LOGOS[logo];
+  return `<main class="app">
+    <header>${L.wordmark()}<div class="score">Score <b class="num ${animate && d.prev !== undefined ? 'tick' : ''}">${d.score < 0 ? '−' + -d.score : d.score}</b></div></header>
+    <div class="price ${d.delayed ? 'delayed' : ''}">
+      <div class="value num">${usd(d.price)}</div>
+      <div class="pair">${d.delayed ? 'Price delayed' : 'BTC/USD'}</div>
+    </div>
+    <div class="buttons">
+      <button class="btn up" data-dir="up" ${locked ? 'disabled' : ''}>${icon(HOOF)}Up ↑</button>
+      <button class="btn down" data-dir="down" ${locked ? 'disabled' : ''}>${icon(CLAW)}Down ↓</button>
+    </div>
+    <p class="rules">Guess where BTC goes in the next minute. Right +1, wrong&nbsp;−1.</p>
+    ${guessCard(d)}
+  </main>`;
+}
+
+function renderSheet() {
+  const rows = Object.entries(LOGOS).map(([k, L]) => `<div class="row">
+    <h2>${k}. ${L.name}<span>?logo=${k}</span></h2>
+    <div class="cell big">${L.wordmark()}<small>Large</small></div>
+    <div class="cell">${L.wordmark()}<small>Header size</small></div>
+    <div class="cell">
+      <div class="tabs">
+        <div class="tab dark">${L.mark(16, true)}Hoof &amp; Claw</div>
+        <div class="tab light">${L.mark(16, true)}Hoof &amp; Claw</div>
+      </div>
+      <div style="display:flex;gap:14px;align-items:end">${L.mark(64, true)}${L.mark(32, true)}${L.mark(16, true)}</div>
+      <small>Favicon in a browser tab (16 px), and the mark at 64, 32 and 16 px</small>
+    </div></div>`).join('');
+  return `<div class="sheet"><h1>Logo concepts</h1><p>Compare at every size. The 16 px favicon is the hardest test.</p>${rows}</div>`;
+}
+
+function render() {
+  document.getElementById('root').innerHTML = view === 'sheet' ? renderSheet() : renderGame();
+  animate = false;
+  const q = new URLSearchParams({ logo, state });
+  for (const k of ['palette', 'sim', 'embed']) if (P0.get(k)) q.set(k, P0.get(k));
+  if (view === 'sheet') q.set('view', 'sheet');
+  history.replaceState(null, '', '?' + q);
+  bar();
+}
+
+function bar() {
+  const L = LOGOS[logo];
+  document.getElementById('bar').innerHTML = `
+    <button data-act="logo-1" title="Previous logo (←)">‹</button><span class="lbl">Logo ${logo} (${L.name})</span><button data-act="logo+1" title="Next logo (→)">›</button>
+    <span class="sep"></span>
+    <button data-act="state-1" title="Previous state (↓)">‹</button><span class="lbl">${view === 'sheet' ? '–' : sim ? 'live: ' + sim.phase : 'State: ' + state}</span><button data-act="state+1" title="Next state (↑)">›</button>
+    <span class="sep"></span>
+    <button data-act="sheet" title="Toggle logo sheet (S)">${view === 'sheet' ? 'Game screen' : 'Logo sheet'}</button>`;
+}
+
+function cycle(list, cur, step) { return list[(list.indexOf(cur) + step + list.length) % list.length]; }
+function act(a) {
+  if (a.startsWith('logo')) logo = cycle(Object.keys(LOGOS), logo, a.endsWith('+1') ? 1 : -1);
+  if (a.startsWith('state')) { stopSim(); view = 'game'; state = cycle(STATES, state, a.endsWith('+1') ? 1 : -1); animate = true; }
+  if (a === 'sheet') view = view === 'sheet' ? 'game' : 'sheet';
+  render();
+}
+
+// ---------- Live simulation (Up/Down from idle) ----------
+function stopSim() { if (sim) clearInterval(sim.timer); sim = null; }
+function startSim(dir) {
+  stopSim();
+  const start = START;
+  sim = { phase: 'open', data: { score: 3, price: start, dir, start, secs: 10 } };
+  sim.timer = setInterval(() => {
+    const d = sim.data;
+    if (sim.phase === 'open') {
+      d.price = +(d.price + (Math.random() - 0.48) * 9).toFixed(2);
+      d.secs -= 1;
+      if (d.secs <= 0) { d.secs = 0; d.price = start; sim.phase = 'waiting'; sim.wait = 3; }
+    } else if (sim.phase === 'waiting') {
+      if (--sim.wait === 0) {
+        const end = +(start + (Math.random() < 0.5 ? 1 : -1) * (4 + Math.random() * 20)).toFixed(2);
+        const correct = (dir === 'up') === (end > start);
+        Object.assign(d, { price: end, end, outcome: correct ? 'Correct' : 'Wrong', prev: 3, score: correct ? 4 : 2 });
+        sim.phase = 'resolved'; animate = true; clearInterval(sim.timer);
+      }
+    }
+    render();
+  }, 1000);
+  render();
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (b) return act(b.dataset.act);
+  const g = e.target.closest('.btn[data-dir]');
+  if (g && !g.disabled) startSim(g.dataset.dir);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input, textarea, [contenteditable]')) return;
+  const map = { ArrowLeft: 'logo-1', ArrowRight: 'logo+1', ArrowUp: 'state+1', ArrowDown: 'state-1', s: 'sheet', S: 'sheet' };
+  if (map[e.key]) { e.preventDefault(); act(map[e.key]); }
+});
+document.fonts.ready.then(render);
+render();
+</script>
+</body>
+</html>
