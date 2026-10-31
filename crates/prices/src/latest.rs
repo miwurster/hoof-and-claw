@@ -32,7 +32,7 @@ impl LatestPrice {
     /// Takes in what the Price source reported.
     pub const fn apply(&mut self, report: Report) {
         match report {
-            Report::Received(price) => self.price = Some(price),
+            Report::Received(price, _) => self.price = Some(price),
             Report::Live => self.delayed = false,
             Report::Delayed => self.delayed = true,
         }
@@ -58,7 +58,7 @@ mod tests {
         let mut latest = LatestPrice::default();
 
         latest.apply(Report::Live);
-        latest.apply(Report::Received(PRICE));
+        latest.apply(Report::Received(PRICE, None));
 
         assert_eq!(latest.price(), Some(PRICE));
         assert!(!latest.is_delayed());
@@ -68,7 +68,7 @@ mod tests {
     fn while_the_price_is_delayed_the_last_price_stays() {
         let mut latest = LatestPrice::default();
         latest.apply(Report::Live);
-        latest.apply(Report::Received(PRICE));
+        latest.apply(Report::Received(PRICE, None));
 
         latest.apply(Report::Delayed);
 
@@ -80,7 +80,7 @@ mod tests {
     fn a_price_received_while_delayed_stays_delayed() {
         let mut latest = LatestPrice::default();
 
-        latest.apply(Report::Received(PRICE));
+        latest.apply(Report::Received(PRICE, None));
 
         assert_eq!(latest.price(), Some(PRICE));
         assert!(latest.is_delayed());

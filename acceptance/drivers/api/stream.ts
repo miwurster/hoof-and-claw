@@ -1,6 +1,6 @@
 // What the API driver shares: decoding the contract's bodies and events, and reading the stream.
 import type { APIResponse } from "@playwright/test";
-import type { Direction, OpenGuess, ServerEvent } from "contract";
+import type { Direction, OpenGuess, Outcome, ResolvedGuess, ServerEvent } from "contract";
 
 export const FORWARDED_FOR = "X-Forwarded-For";
 
@@ -10,6 +10,7 @@ export type View = {
   delayed: boolean;
   score: number;
   openGuess: OpenGuess | null;
+  lastResolved: ResolvedGuess | null;
 };
 
 /** Decodes a body as the contract's type; the one place this driver trusts the server's JSON. */
@@ -41,9 +42,31 @@ export function wire(direction: "Up" | "Down"): Direction {
   return direction === "Up" ? "up" : "down";
 }
 
+export function outcome(shown: "Correct" | "Wrong"): Outcome {
+  return shown === "Correct" ? "correct" : "wrong";
+}
+
+/** The result the page would show: the most recent Resolved guess while there is no Open guess. */
+export function shownResult(view: View): { outcome: Outcome; start: number; end: number } | null {
+  return view.openGuess === null && view.lastResolved !== null
+    ? { outcome: view.lastResolved.outcome, start: view.lastResolved.startPrice, end: view.lastResolved.endPrice }
+    : null;
+}
+
 export function apply(view: View, event: ServerEvent): void {
   if (event.type === "guessPlaced") {
     view.openGuess = event.guess;
+
+    return;
+  }
+
+  if (event.type === "guessResolved") {
+    // As the page does: only the Open guess it holds can resolve, so a repeated event changes nothing (ADR 0010).
+    if (view.openGuess?.id === event.guess.id) {
+      view.openGuess = null;
+      view.lastResolved = event.guess;
+      view.score = event.score;
+    }
 
     return;
   }
@@ -54,6 +77,7 @@ export function apply(view: View, event: ServerEvent): void {
   if (event.type === "snapshot") {
     view.score = event.score;
     view.openGuess = event.openGuess;
+    view.lastResolved = event.lastResolved;
   }
 }
 

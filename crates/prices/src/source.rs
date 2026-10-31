@@ -1,12 +1,12 @@
 //! The `PriceSource` port: what the Price source reports, one report at a time.
 
-use crate::Price;
+use crate::{Price, TradeId};
 
 /// One thing the Price source reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Report {
-    /// The server received a price.
-    Received(Price),
+    /// The server received a price, with the ID of its trade, or `None` for a price that is no trade (the seed).
+    Received(Price, Option<TradeId>),
     /// The connection to the Price source became healthy.
     Live,
     /// The connection to the Price source is no longer healthy: Price delayed.
@@ -45,9 +45,10 @@ pub mod suite {
         driver.sends(Price::from_cents(6_400_000)).await;
 
         assert_eq!(source.next().await, Some(Report::Live));
-        assert_eq!(
-            source.next().await,
-            Some(Report::Received(Price::from_cents(6_400_000)))
+        let received = source.next().await;
+        assert!(
+            matches!(received, Some(Report::Received(price, _)) if price == Price::from_cents(6_400_000)),
+            "the source should deliver the price it sent, but reported {received:?}"
         );
     }
 

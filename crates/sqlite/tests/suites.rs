@@ -25,6 +25,13 @@ mod guessing_store {
         a_placed_guess_is_the_players_open_guess,
         a_player_with_an_open_guess_cannot_place_another,
         players_do_not_affect_each_other,
+        a_resolution_moves_the_score_and_becomes_the_last_resolved_guess,
+        a_seed_price_without_a_trade_id_is_kept_as_one,
+        a_score_can_go_below_0,
+        a_resolution_saved_again_changes_nothing,
+        after_a_resolution_the_player_can_place_the_next_guess,
+        the_last_resolved_guess_is_the_most_recent_one,
+        resolutions_saved_together_move_each_players_own_score,
     );
 }
 

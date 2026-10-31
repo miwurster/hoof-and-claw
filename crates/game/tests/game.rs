@@ -62,7 +62,7 @@ impl Running {
 
     async fn live_at(&self, cents: u64) {
         self.report(Report::Live).await;
-        self.report(Report::Received(price(cents))).await;
+        self.report(Report::Received(price(cents), None)).await;
     }
 
     fn published_prices(&self) -> Vec<u64> {
@@ -99,7 +99,7 @@ fn latest(cents: Option<u64>, delayed: bool) -> LatestPrice {
         Report::Live
     });
     if let Some(cents) = cents {
-        latest.apply(Report::Received(price(cents)));
+        latest.apply(Report::Received(price(cents), None));
     }
     latest
 }
@@ -119,7 +119,9 @@ async fn a_price_equal_to_the_last_one_published_is_not_published() {
     running.live_at(6_400_000).await;
     wait(Duration::from_secs(2)).await;
 
-    running.report(Report::Received(price(6_400_000))).await;
+    running
+        .report(Report::Received(price(6_400_000), None))
+        .await;
     wait(Duration::from_secs(2)).await;
 
     assert_eq!(running.published_prices(), [6_400_000]);
@@ -131,9 +133,13 @@ async fn a_second_change_within_one_second_arrives_when_the_second_ends_with_the
     running.live_at(6_400_000).await;
 
     wait(Duration::from_millis(200)).await;
-    running.report(Report::Received(price(6_400_001))).await;
+    running
+        .report(Report::Received(price(6_400_001), None))
+        .await;
     wait(Duration::from_millis(300)).await;
-    running.report(Report::Received(price(6_400_002))).await;
+    running
+        .report(Report::Received(price(6_400_002), None))
+        .await;
     wait(Duration::from_millis(499)).await;
 
     assert_eq!(
@@ -155,7 +161,7 @@ async fn the_price_stream_carries_at_most_one_price_a_second() {
 
     for cents in 6_400_001..6_400_031 {
         wait(Duration::from_millis(100)).await;
-        running.report(Report::Received(price(cents))).await;
+        running.report(Report::Received(price(cents), None)).await;
     }
     wait(Duration::from_secs(1)).await;
 

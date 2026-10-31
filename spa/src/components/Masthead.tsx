@@ -1,10 +1,9 @@
-import type { ReactNode } from "react";
-
 import mark from "../../../assets/brand/mark.svg";
 import styles from "./Masthead.module.css";
+import { Score } from "./Score";
 
-/** The logo: the mark beside the wordmark, with the ampersand in Horn; what it holds sits on the right. */
-export function Masthead({ children }: { readonly children?: ReactNode }) {
+/** The logo: the mark beside the wordmark, with the ampersand in Horn, and the Player's Score on the right. */
+export function Masthead({ score }: { readonly score: number }) {
   return (
     <header className={styles.masthead}>
       <h1 className={styles.wordmark}>
@@ -13,7 +12,7 @@ export function Masthead({ children }: { readonly children?: ReactNode }) {
           Hoof <span className={styles.ampersand}>&amp;</span> Claw
         </span>
       </h1>
-      {children}
+      <Score score={score} />
     </header>
   );
 }

@@ -38,6 +38,9 @@
   /* Motion */
   --duration-pulse: 2s;
   --opacity-pulse: 0.4;
+  --duration-stamp: 450ms;
+  --scale-stamp-lifted: 1.8;
+  --size-stamp: 3.5rem;
 
   /* Keyboard focus: Horn only */
   --focus-ring: 2px solid var(--color-horn);

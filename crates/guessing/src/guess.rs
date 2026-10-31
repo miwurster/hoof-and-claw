@@ -3,7 +3,7 @@ use std::time::Duration;
 use jiff::{SignedDuration, Timestamp};
 use prices::ReceivedPrice;
 
-use crate::{Direction, GuessId, PlayerId};
+use crate::{Direction, GuessId, Outcome, PlayerId};
 
 /// A Guess falls due this long after it was placed.
 pub const GUESS_DURATION: Duration = Duration::from_secs(60);
@@ -17,6 +17,16 @@ pub struct OpenGuess {
     /// The last price the server received before it accepted the Guess.
     pub start: ReceivedPrice,
     pub placed_at: Timestamp,
+}
+
+/// A Guess for which at least 60 seconds have passed and the price has changed since it was placed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResolvedGuess {
+    /// The Guess as it was while open.
+    pub guess: OpenGuess,
+    /// The first changed price received at least 60 seconds after the Guess (ADR 0002).
+    pub end: ReceivedPrice,
+    pub outcome: Outcome,
 }
 
 /// Why the game refuses to place a Guess.
@@ -62,6 +72,29 @@ impl OpenGuess {
             .unwrap_or(Timestamp::MAX)
     }
 
+    /// Resolves the Guess against a received price, or `None` while it stays open: before it falls due, at a price
+    /// equal to the Start price, or at a price from another Price source (ADR 0002).
+    #[must_use]
+    pub fn resolve(&self, received: ReceivedPrice) -> Option<ResolvedGuess> {
+        let counts = received.received_at >= self.due_at()
+            && received.source == self.start.source
+            && received.price != self.start.price;
+        if !counts {
+            return None;
+        }
+        let went_up = received.price > self.start.price;
+        let outcome = if went_up == (self.direction == Direction::Up) {
+            Outcome::Correct
+        } else {
+            Outcome::Wrong
+        };
+        Some(ResolvedGuess {
+            guess: *self,
+            end: received,
+            outcome,
+        })
+    }
+
     /// The time left at `now` until the Guess falls due, 0 once it has.
     #[must_use]
     pub fn remaining(&self, now: Timestamp) -> Duration {
@@ -81,6 +114,7 @@ mod tests {
         ReceivedPrice {
             price: Price::from_cents(cents),
             source: Source::Bitstamp,
+            trade_id: None,
             received_at: NOW,
         }
     }
@@ -133,6 +167,101 @@ mod tests {
             .unwrap();
 
         assert_eq!(guess.remaining(later), Duration::from_millis(39_750));
+    }
+
+    fn received_at(cents: u64, after: SignedDuration) -> ReceivedPrice {
+        ReceivedPrice {
+            price: Price::from_cents(cents),
+            source: Source::Bitstamp,
+            trade_id: None,
+            received_at: NOW.checked_add(after).unwrap(),
+        }
+    }
+
+    fn placed(direction: Direction) -> OpenGuess {
+        OpenGuess::place(
+            GuessId::new(NOW, [1; 10]),
+            PlayerId::new(NOW, [2; 10]),
+            direction,
+            Some(received(6_400_000)),
+            false,
+            NOW,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_guess_does_not_resolve_before_60_seconds_even_when_the_price_changes() {
+        let guess = placed(Direction::Up);
+
+        assert_eq!(
+            guess.resolve(received_at(6_400_100, SignedDuration::from_secs(30))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_price_received_59_999_seconds_after_the_guess_does_not_resolve_it() {
+        let guess = placed(Direction::Up);
+
+        assert_eq!(
+            guess.resolve(received_at(6_400_100, SignedDuration::from_millis(59_999))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_changed_price_received_at_exactly_60_seconds_resolves_it() {
+        let guess = placed(Direction::Up);
+        let end = received_at(6_400_100, SignedDuration::from_secs(60));
+
+        let resolved = guess.resolve(end).unwrap();
+
+        assert_eq!(resolved.end, end);
+        assert_eq!(resolved.guess, guess);
+    }
+
+    #[test]
+    fn a_price_equal_to_the_start_price_leaves_the_guess_open_after_60_seconds() {
+        let guess = placed(Direction::Down);
+
+        assert_eq!(
+            guess.resolve(received_at(6_400_000, SignedDuration::from_secs(90))),
+            None
+        );
+    }
+
+    #[test]
+    fn a_difference_of_one_cent_resolves_the_guess() {
+        let guess = placed(Direction::Down);
+
+        let resolved = guess
+            .resolve(received_at(6_399_999, SignedDuration::from_secs(61)))
+            .unwrap();
+
+        assert_eq!(resolved.end.price, Price::from_cents(6_399_999));
+    }
+
+    #[test]
+    fn the_outcome_follows_the_direction_and_the_way_the_price_went() {
+        let later = SignedDuration::from_secs(60);
+        let cases = [
+            (Direction::Up, 6_400_001, Outcome::Correct, 1),
+            (Direction::Down, 6_399_999, Outcome::Correct, 1),
+            (Direction::Up, 6_399_999, Outcome::Wrong, -1),
+            (Direction::Down, 6_400_001, Outcome::Wrong, -1),
+        ];
+
+        for (direction, end, outcome, change) in cases {
+            let resolved = placed(direction).resolve(received_at(end, later)).unwrap();
+
+            assert_eq!(resolved.outcome, outcome, "{direction:?} to {end}");
+            assert_eq!(
+                resolved.outcome.score_change(),
+                change,
+                "{direction:?} to {end}"
+            );
+        }
     }
 
     #[test]

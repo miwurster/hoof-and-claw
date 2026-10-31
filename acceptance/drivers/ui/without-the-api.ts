@@ -1,0 +1,28 @@
+// What only the HTTP API can do, which the UI driver refuses: requests the page never sends, and holding the stream.
+
+/** The part of a Player's channel that needs the HTTP API itself. */
+export class WithoutTheApi {
+  guessesWithAPriceAndTimeOfTheirOwn(): Promise<void> {
+    return Promise.reject(new Error("the page sends only a Direction; only the API can carry a price or a time"));
+  }
+
+  guessesADirectionThatIsNeitherUpNorDown(): Promise<void> {
+    return Promise.reject(new Error("the page has only Up and Down"));
+  }
+
+  guessesWithABodyThatIsNotJson(): Promise<void> {
+    return Promise.reject(new Error("the page always sends JSON"));
+  }
+
+  guessesWithoutSayingTheBodyIsJson(): Promise<void> {
+    return Promise.reject(new Error("the page always sends JSON"));
+  }
+
+  holdsTheStream(): Promise<number> {
+    return Promise.reject(new Error("the page reconnects its stream by itself; hold the stream through the API"));
+  }
+
+  expectsTurnedAway(): Promise<void> {
+    return Promise.reject(new Error("the page does not show why the game's API turned it away"));
+  }
+}

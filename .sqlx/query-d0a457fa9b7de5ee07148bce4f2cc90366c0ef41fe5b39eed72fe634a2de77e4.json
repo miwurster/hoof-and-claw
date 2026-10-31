@@ -1,0 +1,158 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id,\n                 end_price_cents AS \"end_price_cents!\", end_received_at AS \"end_received_at!\",\n                 end_source AS \"end_source!\", end_trade_id, outcome AS \"outcome!\"\n             FROM guesses WHERE player_id = ? AND state = 'resolved'\n             ORDER BY resolved_at DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "direction",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "name": "placed_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "name": "start_price_cents",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_price_cents"
+          }
+        }
+      },
+      {
+        "name": "start_received_at",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_received_at"
+          }
+        }
+      },
+      {
+        "name": "start_source",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_source"
+          }
+        }
+      },
+      {
+        "name": "start_trade_id",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_trade_id"
+          }
+        }
+      },
+      {
+        "name": "end_price_cents!",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "end_price_cents"
+          }
+        }
+      },
+      {
+        "name": "end_received_at!",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "end_received_at"
+          }
+        }
+      },
+      {
+        "name": "end_source!",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "end_source"
+          }
+        }
+      },
+      {
+        "name": "end_trade_id",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "end_trade_id"
+          }
+        }
+      },
+      {
+        "name": "outcome!",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "outcome"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "d0a457fa9b7de5ee07148bce4f2cc90366c0ef41fe5b39eed72fe634a2de77e4"
+}

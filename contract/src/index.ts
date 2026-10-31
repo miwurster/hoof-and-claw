@@ -3,6 +3,7 @@ export type * from "./Direction";
 export type * from "./ErrorBody";
 export type * from "./ErrorCode";
 export type * from "./GuessPlaced";
+export type * from "./GuessResolved";
 export type * from "./Health";
 export type * from "./OpenGuess";
 export type * from "./Outcome";

@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 
-import type { Direction, PlayerDriver, Refusal, Standing } from "./drivers";
+import type { Direction, Outcome, PlayerDriver, Refusal, Standing } from "./drivers";
 
 const MINUTE_MS = 60_000;
 
@@ -22,7 +22,7 @@ export class Player {
     readonly name: string,
     private readonly driver: PlayerDriver,
   ) {
-    this.should = { ...seeing(name, driver), ...acting(driver) };
+    this.should = { ...seeing(name, driver), ...resolving(driver), ...acting(driver) };
   }
 
   async opensAnUnknownPage(): Promise<void> {
@@ -31,6 +31,11 @@ export class Player {
 
   async opensTheGame(): Promise<void> {
     await this.driver.opensTheGame();
+  }
+
+  /** Closes the game, so no page of it is open, as when the Player closes the browser. */
+  async closesTheGame(): Promise<void> {
+    await this.driver.closesTheGame();
   }
 
   async opensThePage(): Promise<void> {
@@ -119,6 +124,22 @@ function seeing(name: string, driver: PlayerDriver) {
     },
     seeTheGuessWaitingForThePriceToMove: async (): Promise<void> => {
       await driver.expectsWaitingForThePriceToMove();
+    },
+  };
+}
+
+/** What a Player should see of their Resolved guess. */
+function resolving(driver: PlayerDriver) {
+  return {
+    /** Sees the result of their Resolved guess: the Outcome, the Start price and End price, such as "64,000.00". */
+    seeTheResult: async (outcome: Outcome, startPrice: string, endPrice: string): Promise<void> => {
+      await driver.expectsResult(outcome, startPrice, endPrice);
+    },
+    seeNoResult: async (): Promise<void> => {
+      await driver.expectsNoResult();
+    },
+    hearTheOutcomeAnnouncedAs: async (outcome: Outcome): Promise<void> => {
+      await driver.expectsOutcomeAnnounced(outcome);
     },
   };
 }

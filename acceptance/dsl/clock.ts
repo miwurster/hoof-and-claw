@@ -7,6 +7,10 @@ export function seconds(count: number): Span {
   return { milliseconds: count * 1000 };
 }
 
+export function milliseconds(count: number): Span {
+  return { milliseconds: count };
+}
+
 /** The server's clock, which stands still until a test moves it (ADR 0011). */
 export class Clock {
   constructor(private readonly driver: ControlsDriver) {}

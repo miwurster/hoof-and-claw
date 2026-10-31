@@ -59,7 +59,7 @@ impl<C: Clock, F: Fanout, S: Store> Api<C, F, S> {
             delayed: price.delayed,
             score: snapshot.score.value(),
             open_guess: snapshot.open_guess.map(Into::into),
-            last_resolved: None,
+            last_resolved: snapshot.last_resolved.map(Into::into),
         })
     }
 }
@@ -78,9 +78,12 @@ pub(crate) async fn events<C: Clock, F: Fanout, S: Store>(
     State(api): State<Api<C, F, S>>,
     Extension(token): Extension<Token>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ErrorCode> {
-    let player = api.player(&token).await?;
     // Subscribe before the snapshot, so an event published in between arrives as an event (ADR 0010).
-    let subscription = api.game.subscribe(player);
+    let (player, subscription) = api
+        .game
+        .open_stream(&token)
+        .await
+        .map_err(|error| internal(&error))?;
     let first = stream::once(std::future::ready(ServerEvent::Snapshot(
         api.snapshot(player).await?,
     )));

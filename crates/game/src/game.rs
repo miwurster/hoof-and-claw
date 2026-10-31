@@ -1,8 +1,11 @@
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use guessing::{Direction, GuessId, OpenGuess, PlayerId, Refusal, Score, StoreError};
-use identity::Token;
+use guessing::{
+    Direction, DueGuesses, GuessId, OpenGuess, PlayerId, Refusal, ResolvedGuess, Score, StoreError,
+};
+use identity::{Token, TokenHash};
 use jiff::Timestamp;
 use prices::{LatestPrice, PriceSource, ReceivedPrice, Report, Source};
 use tokio::time::Instant;
@@ -11,6 +14,10 @@ use crate::{Clock, Fanout, PlayerEvent, Subscription};
 
 /// The server publishes at most one price a second for all streams together (ADR 0010).
 const PRICE_INTERVAL: Duration = Duration::from_secs(1);
+
+/// The first wait before a failed save of resolutions is tried again; each further wait doubles, up to the longest.
+const FIRST_RETRY: Duration = Duration::from_millis(100);
+const LONGEST_RETRY: Duration = Duration::from_secs(5);
 
 /// Every store port the game writes to; `sqlite::Database` is one, and a test can join the in-memory fakes into one.
 pub trait Store: guessing::Store + identity::Store {}
@@ -24,6 +31,11 @@ pub struct Game<C, F, S> {
     fanout: F,
     store: S,
     prices: Arc<Mutex<Prices>>,
+    /// The Open guesses, by when they fall due.
+    due: Arc<Mutex<DueGuesses>>,
+    /// The Player ID that the first Guess of a visitor with an open stream will take, so that stream gets the
+    /// Player's events from that Guess on.
+    visitors: Arc<Mutex<HashMap<TokenHash, PlayerId>>>,
 }
 
 /// An Open guess with the time it has left by the server's clock.
@@ -40,6 +52,8 @@ pub struct Snapshot {
     pub latest: LatestPrice,
     pub score: Score,
     pub open_guess: Option<Open>,
+    /// The Player's most recent Resolved guess, which the page shows until the next Guess.
+    pub last_resolved: Option<ResolvedGuess>,
 }
 
 /// The store could not be read or written, or no random bytes were available for a new ID.
@@ -94,6 +108,8 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
             fanout,
             store,
             prices: Arc::default(),
+            due: Arc::default(),
+            visitors: Arc::default(),
         }
     }
 
@@ -110,16 +126,19 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
             tokio::select! {
                 report = source.next() => {
                     let Some(report) = report else { return };
-                    let mut prices = self.lock();
-                    prices.latest.apply(report);
-                    if let Report::Received(price) = report {
+                    if let Report::Received(price, trade_id) = report {
                         // The controllable source of the test controls stands in for Bitstamp.
-                        prices.last_received = Some(ReceivedPrice {
+                        let received = ReceivedPrice {
                             price,
                             source: Source::Bitstamp,
+                            trade_id,
                             received_at: self.clock.now(),
-                        });
+                        };
+                        self.lock().last_received = Some(received);
+                        self.resolve(received).await;
                     }
+                    let mut prices = self.lock();
+                    prices.latest.apply(report);
                     if prices.latest.is_delayed() != prices.published.is_delayed() {
                         self.publish(&mut prices);
                     } else if prices.latest.price() != prices.published.price() {
@@ -160,10 +179,13 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
             (prices.last_received, prices.latest.is_delayed())
         };
         let now = self.clock.now();
+        let fresh = PlayerId::new(now, random()?);
+        // A stream opened meanwhile subscribes as the same Player.
+        let player = *self.waiting_visitors().entry(token.hash()).or_insert(fresh);
         // The price is checked before anything is written, so a refused Guess stores no Player.
         let candidate = OpenGuess::place(
             GuessId::new(now, random()?),
-            PlayerId::new(now, random()?),
+            player,
             direction,
             last_received,
             delayed,
@@ -173,11 +195,14 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         let player = identity::Store::link(&self.store, token.hash(), candidate.player)
             .await
             .map_err(Unavailable::from)?;
+        // From now on the token belongs to a Player, whom every stream opened later subscribes as.
+        self.waiting_visitors().remove(&token.hash());
         let guess = OpenGuess {
             player,
             ..candidate
         };
         guessing::Store::place(&self.store, &guess).await?;
+        self.due_guesses().add(guess);
         let open = Open {
             guess,
             remaining: guess.remaining(now),
@@ -219,7 +244,29 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
                 guess,
                 remaining: guess.remaining(server_time),
             }),
+            last_resolved: standing.last_resolved,
         })
+    }
+
+    /// Opens the events of one stream for the browser's token, and answers whose stream it is: the Player, or `None`
+    /// for a visitor who has placed no Guess yet.
+    ///
+    /// A visitor's stream subscribes as the Player that the visitor's first Guess will create, so it gets that
+    /// Player's events from the first Guess on.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the store is unavailable, or no random bytes are available for the Player ID.
+    pub async fn open_stream(
+        &self,
+        token: &Token,
+    ) -> Result<(Option<PlayerId>, Subscription), Unavailable> {
+        if let Some(player) = self.player(token).await? {
+            return Ok((Some(player), self.fanout.subscribe(Some(player))));
+        }
+        let fresh = PlayerId::new(self.clock.now(), random()?);
+        let waiting = *self.waiting_visitors().entry(token.hash()).or_insert(fresh);
+        Ok((None, self.fanout.subscribe(Some(waiting))))
     }
 
     /// Opens the events of one stream: every price, and the Player's own events.
@@ -239,6 +286,47 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         prices.latest = LatestPrice::default();
         prices.last_received = None;
         self.publish(&mut prices);
+    }
+
+    /// Resolves every Open guess the received price resolves, saves the resolutions, and only then publishes them
+    /// (ADR 0010).
+    ///
+    /// The resolutions wait here with their End price until the save succeeds, so no later price can change it; a
+    /// failed save is tried again, after a growing wait on `tokio`'s real time.
+    async fn resolve(&self, received: ReceivedPrice) {
+        let resolved = self.due_guesses().resolve(received);
+        if resolved.is_empty() {
+            return;
+        }
+        let mut wait = FIRST_RETRY;
+        let saved = loop {
+            match guessing::Store::resolve(&self.store, &resolved).await {
+                Ok(saved) => break saved,
+                Err(error) => {
+                    tracing::error!(
+                        guesses = resolved.len(),
+                        retry_ms = wait.as_millis(),
+                        "cannot save resolutions: {error}"
+                    );
+                    tokio::time::sleep(wait).await;
+                    wait = (wait * 2).min(LONGEST_RETRY);
+                }
+            }
+        };
+        for resolution in saved {
+            self.fanout.notify_player(
+                resolution.guess.guess.player,
+                PlayerEvent::GuessResolved(resolution),
+            );
+        }
+    }
+
+    fn waiting_visitors(&self) -> std::sync::MutexGuard<'_, HashMap<TokenHash, PlayerId>> {
+        self.visitors.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn due_guesses(&self) -> std::sync::MutexGuard<'_, DueGuesses> {
+        self.due.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     fn publish(&self, prices: &mut Prices) {

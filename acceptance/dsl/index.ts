@@ -10,10 +10,12 @@ import { Server } from "./server";
 import { startServer } from "./server-process";
 import type { ServerProcess } from "./server-process";
 
-export { seconds } from "./clock";
+export { milliseconds, seconds } from "./clock";
 
 type Actors = {
   readonly alice: Player;
+  /** Another Player, on a network of his own. */
+  readonly bob: Player;
   /** Players on Alice's network. */
   readonly neighbours: Neighbours;
   readonly priceSource: PriceSource;
@@ -73,6 +75,18 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     });
 
     await use(new Player("Alice", driver));
+    await driver.close();
+  },
+
+  bob: async ({ drivers, serverProcess, browser, playwright }, use) => {
+    const driver = await drivers.player({
+      baseURL: serverProcess.baseURL,
+      browser,
+      request: playwright.request,
+      network: freshNetwork(),
+    });
+
+    await use(new Player("Bob", driver));
     await driver.close();
   },
 

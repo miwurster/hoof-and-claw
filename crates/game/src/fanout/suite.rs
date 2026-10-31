@@ -17,7 +17,7 @@ const AT: Timestamp = Timestamp::constant(1_798_761_600, 0);
 fn live(cents: u64) -> LatestPrice {
     let mut latest = LatestPrice::default();
     latest.apply(Report::Live);
-    latest.apply(Report::Received(Price::from_cents(cents)));
+    latest.apply(Report::Received(Price::from_cents(cents), None));
     latest
 }
 
@@ -38,6 +38,7 @@ fn placed(player: PlayerId, byte: u8) -> PlayerEvent {
             start: ReceivedPrice {
                 price: Price::from_cents(6_400_000),
                 source: Source::Bitstamp,
+                trade_id: None,
                 received_at: AT,
             },
             placed_at: AT,

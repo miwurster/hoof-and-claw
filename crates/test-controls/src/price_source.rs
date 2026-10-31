@@ -26,7 +26,8 @@ pub fn controllable_source() -> (ControllableSource, SourceControls) {
 impl SourceControls {
     /// The Price source sends a price, which the server receives.
     pub fn send(&self, price: Price) {
-        self.report(Report::Received(price));
+        // The controllable source stands in for Bitstamp without trades of its own, so its prices carry no trade id.
+        self.report(Report::Received(price, None));
     }
 
     /// Restores the connection to the Price source, or loses it, which makes the price Price delayed.

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { expect } from "@playwright/test";
 import type { APIRequest, Browser, BrowserContext, Locator, Page, Route } from "@playwright/test";
 
+import { WithoutTheApi } from "./without-the-api";
+
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
 const IDENTITY = "__Host-player";
 const GUESSES = "**/api/guesses";
@@ -44,19 +46,22 @@ function shown(price: string | null): string {
 }
 
 /** A Player's page in their own browser context. */
-class UiPlayer {
+class UiPlayer extends WithoutTheApi {
   private readonly price;
   private readonly announcement;
   private readonly openGuess;
+  private readonly result;
   private held: Promise<Route> | undefined;
 
   constructor(
     private readonly context: BrowserContext,
     private readonly page: Page,
   ) {
+    super();
     this.price = page.getByRole("region", { name: "BTC/USD price" });
     this.announcement = this.price.getByRole("status");
     this.openGuess = page.getByRole("region", { name: "Open guess" });
+    this.result = page.getByRole("region", { name: "Resolved guess" });
   }
 
   private button(direction: "Up" | "Down"): Locator {
@@ -67,8 +72,9 @@ class UiPlayer {
     await this.page.goto("/");
   }
 
+  /** Presses a Direction and waits for the server's answer, so the Guess is placed or refused when this returns. */
   async guesses(direction: "Up" | "Down"): Promise<void> {
-    await this.button(direction).click();
+    await Promise.all([this.page.waitForResponse(GUESSES), this.button(direction).click()]);
   }
 
   async startsToGuess(direction: "Up" | "Down"): Promise<void> {
@@ -95,22 +101,6 @@ class UiPlayer {
     this.held = undefined;
   }
 
-  guessesWithAPriceAndTimeOfTheirOwn(): Promise<void> {
-    return Promise.reject(new Error("the page sends only a Direction; only the API can carry a price or a time"));
-  }
-
-  guessesADirectionThatIsNeitherUpNorDown(): Promise<void> {
-    return Promise.reject(new Error("the page has only Up and Down"));
-  }
-
-  guessesWithABodyThatIsNotJson(): Promise<void> {
-    return Promise.reject(new Error("the page always sends JSON"));
-  }
-
-  guessesWithoutSayingTheBodyIsJson(): Promise<void> {
-    return Promise.reject(new Error("the page always sends JSON"));
-  }
-
   async movesTheFocusTo(direction: "Up" | "Down"): Promise<void> {
     const button = this.button(direction);
 
@@ -125,6 +115,11 @@ class UiPlayer {
 
   async pressesEnter(): Promise<void> {
     await this.page.keyboard.press("Enter");
+  }
+
+  /** Leaves the game for a blank page, which closes the game's stream. */
+  async closesTheGame(): Promise<void> {
+    await this.page.goto("about:blank");
   }
 
   async opensAnUnknownPage(): Promise<void> {
@@ -152,10 +147,6 @@ class UiPlayer {
 
   async expectsAnyPrice(): Promise<void> {
     await expect(this.price.getByText(/^\$\d{1,3}(?:,\d{3})*\.\d{2}$/u)).toBeVisible();
-  }
-
-  holdsTheStream(): Promise<number> {
-    return Promise.reject(new Error("the page reconnects its stream by itself; hold the stream through the API"));
   }
 
   async expectsScore(score: number): Promise<void> {
@@ -197,6 +188,28 @@ class UiPlayer {
     await expect(this.openGuess).toContainText("Waiting for the price to move…");
   }
 
+  async expectsResult(outcome: "Correct" | "Wrong", startPrice: string, endPrice: string): Promise<void> {
+    await expect(this.result).toContainText(outcome);
+    await expect(this.result).toContainText(`Start price ${shown(startPrice)}`);
+    await expect(this.result).toContainText(`End price ${shown(endPrice)}`);
+    await expect(this.result).toContainText(outcome === "Correct" ? "Score +1" : "Score −1");
+    await expect(this.openGuess).toHaveCount(0);
+  }
+
+  async expectsNoResult(): Promise<void> {
+    await expect(this.page.getByRole("region", { name: "Score" })).toBeVisible();
+    await expect(this.result).toHaveCount(0);
+  }
+
+  /** A polite live region tells the Outcome, and no live region holds a price. */
+  async expectsOutcomeAnnounced(outcome: "Correct" | "Wrong"): Promise<void> {
+    const live = this.page.locator('[aria-live="polite"], [role="status"], output');
+
+    await expect(live.filter({ hasText: outcome }), `the Outcome ${outcome} should be announced`).toHaveCount(1);
+    await expect(live.filter({ hasText: outcome })).toHaveAttribute("aria-live", "polite");
+    await expect(live.filter({ hasText: "$" }), "no price should be announced").toHaveCount(0);
+  }
+
   async expectsNoSecondGuess(): Promise<void> {
     await expect(this.openGuess).toBeVisible();
     await this.expectsGuessing(false);
@@ -231,10 +244,6 @@ class UiPlayer {
     const cookies = await this.context.cookies();
 
     expect(cookies.find((cookie) => cookie.name === IDENTITY)).toBeUndefined();
-  }
-
-  expectsTurnedAway(): Promise<void> {
-    return Promise.reject(new Error("the page does not show why the game's API turned it away"));
   }
 
   async expectsGuessing(possible: boolean): Promise<void> {

@@ -1,86 +1,16 @@
 //! Placing a Guess, with a fake Price source, a clock the test moves, the in-memory stores and the recording `Fanout`.
 
-use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use game::{Clock, Event, Game, PlaceError, PlayerEvent, Recording};
+use game::{Event, PlaceError, PlayerEvent};
 use guessing::{Direction, Refusal, Score};
 use identity::Token;
-use jiff::{SignedDuration, Timestamp};
-use prices::{Price, PriceSource, ReceivedPrice, Report, Source};
-use support::Stores;
-use tokio::sync::mpsc;
+use jiff::SignedDuration;
+use prices::{Price, ReceivedPrice, Report, Source};
+use running::{NOW, Running};
 
+mod running;
 mod support;
-
-/// 2026-10-31T12:00:00Z.
-const NOW: Timestamp = Timestamp::constant(1_793_448_000, 0);
-
-#[derive(Clone)]
-struct MovableClock(Arc<Mutex<Timestamp>>);
-
-impl MovableClock {
-    fn advance(&self, duration: SignedDuration) {
-        let mut now = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        *now = now.saturating_add(duration).unwrap_or(Timestamp::MAX);
-    }
-}
-
-impl Clock for MovableClock {
-    fn now(&self) -> Timestamp {
-        *self.0.lock().unwrap_or_else(PoisonError::into_inner)
-    }
-}
-
-struct FakeSource(mpsc::UnboundedReceiver<Report>);
-
-impl PriceSource for FakeSource {
-    async fn next(&mut self) -> Option<Report> {
-        self.0.recv().await
-    }
-}
-
-struct Running {
-    game: Game<MovableClock, Recording, Stores>,
-    clock: MovableClock,
-    fanout: Recording,
-    reports: mpsc::UnboundedSender<Report>,
-}
-
-impl Running {
-    fn start() -> Self {
-        let clock = MovableClock(Arc::new(Mutex::new(NOW)));
-        let fanout = Recording::new();
-        let game = Game::new(clock.clone(), fanout.clone(), Stores::default());
-        let (reports, receiver) = mpsc::unbounded_channel();
-        tokio::spawn({
-            let game = game.clone();
-            async move { game.run(FakeSource(receiver)).await }
-        });
-        Self {
-            game,
-            clock,
-            fanout,
-            reports,
-        }
-    }
-
-    async fn report(&self, report: Report) {
-        assert!(
-            self.reports.send(report).is_ok(),
-            "the game should still take reports"
-        );
-        for _ in 0..10 {
-            tokio::task::yield_now().await;
-        }
-    }
-
-    async fn live_at(&self, cents: u64) {
-        self.report(Report::Live).await;
-        self.report(Report::Received(Price::from_cents(cents)))
-            .await;
-    }
-}
 
 fn alice() -> Token {
     Token::from_random_bytes([1; 32])
@@ -107,6 +37,7 @@ async fn a_guess_starts_from_the_last_price_received_with_60_seconds_left() {
         ReceivedPrice {
             price: Price::from_cents(6_400_000),
             source: Source::Bitstamp,
+            trade_id: None,
             received_at: NOW,
         }
     );
@@ -122,7 +53,7 @@ async fn the_start_price_is_the_last_price_received_even_before_the_streams_were
 
     // Within the same second, so the throttle holds it back from the streams.
     running
-        .report(Report::Received(Price::from_cents(6_400_050)))
+        .report(Report::Received(Price::from_cents(6_400_050), None))
         .await;
     let open = running
         .game
