@@ -14,6 +14,10 @@ _Avoid_: User, account
 A player's prediction that the BTC/USD price will be higher (Up) or lower (Down) than at the moment of guessing.
 _Avoid_: Call (except in the tagline), bet, prediction
 
+**Price source**:
+The third-party feed the server receives BTC/USD prices from; the server is the only party that observes prices.
+_Avoid_: Oracle, ticker, provider
+
 **Direction**:
 The side a guess takes: Up or Down.
 _Avoid_: Bull/bear, long/short, hoof/claw (those are visual motifs, not terms)
@@ -28,11 +32,11 @@ A guess for which at least 60 seconds have passed and the price has changed sinc
 _Avoid_: Settled, closed, finished
 
 **Start price**:
-The BTC/USD price at the moment a guess is placed.
+The last BTC/USD price the server received before it accepted a guess.
 _Avoid_: Entry price, guess price, opening price
 
 **End price**:
-The BTC/USD price a guess is resolved against: the first price observed at least 60 seconds after the guess was placed that differs from the Start price.
+The BTC/USD price a guess is resolved against: the first price the server receives from the Start price's Price source, at least 60 seconds after the guess was placed, that differs from the Start price by at least one tick.
 _Avoid_: Exit price, resolution price, closing price
 
 **Outcome**:
