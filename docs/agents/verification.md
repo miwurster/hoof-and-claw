@@ -1,8 +1,8 @@
 # Verification
 
 How the `verification` skill proves a change in this repo.
-Draft: the commands below are the target; the tasks and routes they name are built with the first code.
-The routes of the game itself come from the API contract, which is not yet specified.
+Draft: the tasks below are built with the first code.
+Read the routes from the code, not from this file: the game's routes from the router in `crates/web`, the test controls from `crates/test-controls`.
 
 ## Green gate
 
@@ -27,7 +27,7 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 
 - **HTTP API:** `curl` with a cookie jar (`-c jar -b jar`).
   The first request issues the identity cookie; every later request of the same Player sends the same jar, and a new Player is a new jar.
-- **SSE stream:** `curl -N -b jar localhost:<port>/<stream route>`; the first event is the snapshot.
+- **SSE stream:** `curl -N -b jar` on the stream route; the first event is the snapshot.
 - **Web UI:** a Playwright browser session against `http://localhost:<port>/`, finding elements by role and accessible name.
 
 ## Acceptance suite
@@ -49,7 +49,7 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 
 ## Observe
 
-Only the four `test-controls` commands, over HTTP on the launched instance:
+Only the four `test-controls` commands, over HTTP on the launched instance, at the routes `crates/test-controls` defines:
 
 1. Send a price.
 2. Lose the connection to the Price source, or restore it.
