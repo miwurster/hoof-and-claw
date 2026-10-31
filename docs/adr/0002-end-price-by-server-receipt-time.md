@@ -20,7 +20,7 @@ Both times come from the server's clock, because the server is the only authorit
 
 ## Consequences
 
-- The server holds prices exactly at the source's tick size, 0.01 USD for Coinbase BTC-USD, as an integer of the smallest unit or an exact decimal, never as floating point.
+- The server holds prices exactly at the source's tick size, 0.01 USD for Bitstamp BTC/USD (ADR 0004), as an integer of the smallest unit or an exact decimal, never as floating point.
 - A price equal to the Start price does not count, and the guess stays open.
 - A guess records the Price source of its Start price and ignores prices from any other source, because Coinbase and Kraken differ by a few dollars and switching sources mid-guess would fake a change.
   If that source never recovers, the guess stays open, and the price source decision settles what happens then.
