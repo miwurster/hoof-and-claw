@@ -23,7 +23,9 @@ Resolution compares a timer per Open guess, a periodic sweep, and resolving on e
 - **Resolution.** Resolve on the price tick, and use an index on the due time so each tick touches only the guesses that are due.
   The glossary's End price is "the first price observed at least 60 seconds after the guess was placed that differs from the Start price", so a guess can only resolve when a price is observed.
   A timer per guess or a periodic sweep cannot resolve anything without a fresh price, so at best they only trigger fetching one.
-- **Bottleneck by scale.** Demo scale has none. At medium scale it is running more than one server process: who ingests prices and who resolves. At large scale it is the burst of resolution writes and per-player notifications on every tick, plus the connection fan-out itself.
+- **Bottleneck by scale.** Demo scale has none.
+  At medium scale it is running more than one server process: who ingests prices and who resolves.
+  At large scale it is the burst of resolution writes and per-player notifications on every tick, plus the connection fan-out itself.
 
 ## Facts from primary sources
 
