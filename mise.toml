@@ -30,6 +30,12 @@ description = "Start a server with the test controls: PORT=<port> DATABASE_PATH=
 depends = ["build:launch"]
 run = 'RENDER_GIT_COMMIT="$(git rev-parse HEAD)" exec target/gate/server'
 
+# Release: fast-forward `release`, which Render builds and deploys (ADR 0013).
+
+[tasks.release]
+description = "Release a main commit whose Green gate passed: mise run release [sha], origin/main by default"
+run = "node tools/release/release.ts"
+
 # The parts of the Green gate, each runnable alone.
 
 [tasks."gate:rust-format"]
@@ -108,6 +114,10 @@ run = "pnpm --recursive --if-present run typecheck && tsc -p tools"
 [tasks."gate:depcruise"]
 run = "pnpm --recursive --if-present run depcruise"
 
+[tasks."gate:tools"]
+description = "Test the repo's own tools, the release task among them"
+run = "node --test 'tools/**/*.test.ts'"
+
 [tasks."gate:vitest"]
 run = "pnpm --filter spa test"
 
@@ -142,6 +152,7 @@ run = [
   { task = "gate:typecheck" },
   { task = "gate:depcruise" },
   { task = "gate:vitest" },
+  { task = "gate:tools" },
   { task = "acceptance" },
   { task = "perf" },
 ]
