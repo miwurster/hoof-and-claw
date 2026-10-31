@@ -222,7 +222,8 @@ Its limit is that it lives on one host, not its write speed.
 Writes must be batched, though.
 With one transaction and one disk flush per placed Guess, a laptop managed only about 256 Guesses a second, while batches of resolutions ran at 19,000 to 87,000 a second.
 
-Postgres takes over from step 1 on and carries 10,000 to well over 100,000 Players on one primary.
+Postgres takes over from step 1 on.
+A local Postgres on a laptop ran about 28,000 complete Guesses a second, so we estimate that one primary carries 10,000 to well over 100,000 Players; that benchmark is an upper bound, not a measurement on a cloud database.
 Read replicas don't help, because every read is a lookup of one Player.
 At that size, the table of resolved Guesses needs monthly partitions.
 
