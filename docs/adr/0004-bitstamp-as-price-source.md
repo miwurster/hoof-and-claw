@@ -37,7 +37,7 @@ All terms were read on 2026-10-31.
   The rules still hold, because a guess resolves on the first changed price after 60 seconds (ADR 0002).
 - Bitstamp's tick size for BTC/USD is 0.01 USD, the same as Coinbase's, so the price precision in ADR 0002 stands.
 - There is no fallback whose terms allow the demo.
-  When Bitstamp's feed is down, nothing resolves and the price shown is stale; "Price source and sampling" settles how the game shows that and what happens to open guesses.
+  When Bitstamp's feed is down, nothing resolves and the price shown is stale; ADR 0007 decides how the game shows that and what happens to open guesses.
 - The terms can change without notice, as Coinbase's did in August 2026.
   The spec names the terms read here, and they are read again before any step on the path below.
 - Agent-run tests and test environments use a stubbed price source, not a live feed, which also keeps clear of Coinbase's clause on AI and automated systems should Coinbase become a source later.

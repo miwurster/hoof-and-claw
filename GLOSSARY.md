@@ -18,6 +18,10 @@ _Avoid_: Call (except in the tagline), bet, prediction
 The third-party feed the server receives BTC/USD prices from; the server is the only party that observes prices.
 _Avoid_: Oracle, ticker, provider
 
+**Price delayed**:
+The state in which the server has no live connection to the Price source; the last price stays visible, and no guess can be placed.
+_Avoid_: Offline, stale, outage
+
 **Direction**:
 The side a guess takes: Up or Down.
 _Avoid_: Bull/bear, long/short, hoof/claw (those are visual motifs, not terms)
