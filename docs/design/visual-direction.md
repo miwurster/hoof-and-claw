@@ -49,6 +49,7 @@ Below 20 px the mark switches to a simplified drawing: a wider cleft in the hoof
 - [`assets/brand/favicon.svg`](../../assets/brand/favicon.svg): the simplified mark, for the favicon and other sizes below 20 px.
 
 Ampersand, split and tracks concepts were compared in mockups; bull and bear heads were ruled out before that.
+The throwaway mockups behind these decisions, including the colour-vision comparison, live on the [`prototype/visual-direction`](https://github.com/miwurster/hoof-and-claw/tree/prototype/visual-direction/prototype/visual-direction) branch.
 
 ## Layout
 
