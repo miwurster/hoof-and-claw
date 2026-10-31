@@ -11,6 +11,11 @@ export function formatScore(score: number): string {
   return `Score ${score < 0 ? `−${String(-score)}` : String(score)}`;
 }
 
+/** How an Outcome changed the Score, such as `Score +1` or `Score −1`, with a true minus sign. */
+export function formatScoreChange(change: number): string {
+  return `Score ${change < 0 ? `−${String(-change)}` : `+${String(change)}`}`;
+}
+
 /** The difference of the latest price from the Start price, such as `+$12.40 ↑`, or `$0.00` with no arrow. */
 export function formatDifference(cents: number): string {
   if (cents === 0) {

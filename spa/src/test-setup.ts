@@ -10,6 +10,14 @@ class SilentEventSource {
 
 vi.stubGlobal("EventSource", SilentEventSource);
 
+/** jsdom has no `matchMedia`; a page under test has no preference, such as for reduced motion. */
+vi.stubGlobal("matchMedia", (query: string) => ({
+  matches: false,
+  media: query,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+}));
+
 afterEach(() => {
   cleanup();
 });

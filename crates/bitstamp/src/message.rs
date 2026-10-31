@@ -3,7 +3,7 @@
 use serde_json::{Value, json};
 
 use crate::price::{self, InvalidPrice};
-use prices::Price;
+use prices::{Price, TradeId};
 
 /// The only channel the adapter subscribes to (ADR 0004).
 const CHANNEL: &str = "live_trades_btcusd";
@@ -12,7 +12,8 @@ const CHANNEL: &str = "live_trades_btcusd";
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Message {
     SubscriptionSucceeded,
-    Trade(Price),
+    /// A trade's price, with its `id`; a trade without a numeric `id` still counts, with none.
+    Trade(Price, Option<TradeId>),
     HeartbeatAnswered,
     RequestReconnect,
     /// The subscription ended, or Bitstamp refused a request.
@@ -38,7 +39,11 @@ pub(crate) fn parse(text: &str) -> Result<Message, InvalidPrice> {
     Ok(match text_at("/event") {
         Some("trade") if on_channel => {
             let price_str = text_at("/data/price_str").unwrap_or_default();
-            Message::Trade(price::parse(price_str)?)
+            let id = message
+                .pointer("/data/id")
+                .and_then(Value::as_u64)
+                .map(TradeId::new);
+            Message::Trade(price::parse(price_str)?, id)
         }
         Some("bts:subscription_succeeded") if on_channel => Message::SubscriptionSucceeded,
         Some("bts:heartbeat") => Message::HeartbeatAnswered,
@@ -58,7 +63,10 @@ mod tests {
 
         assert_eq!(
             parse(text),
-            Ok(Message::Trade(Price::from_cents(6_400_012)))
+            Ok(Message::Trade(
+                Price::from_cents(6_400_012),
+                Some(TradeId::new(1))
+            ))
         );
     }
 

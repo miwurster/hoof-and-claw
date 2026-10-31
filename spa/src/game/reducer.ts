@@ -1,4 +1,4 @@
-import type { ErrorCode, OpenGuess, ServerEvent } from "contract";
+import type { ErrorCode, OpenGuess, ResolvedGuess, ServerEvent } from "contract";
 
 /** The Open guess, and when it falls due on the page's own clock: its remaining time after it arrived. */
 export type HeldGuess = {
@@ -15,6 +15,8 @@ export type GameState = {
   readonly delayed: boolean;
   readonly score: number;
   readonly openGuess: HeldGuess | null;
+  /** The most recent Resolved guess, whose result shows until the next Guess. */
+  readonly lastResolved: ResolvedGuess | null;
   /** From the press until the answer or the Guess placed event arrives. */
   readonly placing: boolean;
   readonly message: Message | null;
@@ -33,6 +35,7 @@ export const initialState: GameState = {
   delayed: true,
   score: 0,
   openGuess: null,
+  lastResolved: null,
   placing: false,
   message: null,
 };
@@ -59,11 +62,19 @@ function receive(state: GameState, event: ServerEvent, at: number): GameState {
       delayed: event.delayed,
       score: event.score,
       openGuess: event.openGuess === null ? null : hold(state.openGuess, event.openGuess, at),
+      lastResolved: event.lastResolved,
     };
   }
 
   if (event.type === "price") {
     return { ...state, price: event.price, delayed: event.delayed };
+  }
+
+  if (event.type === "guessResolved") {
+    // An event may repeat what the snapshot already holds; only the Open guess the page holds can resolve (ADR 0010).
+    return state.openGuess?.guess.id === event.guess.id
+      ? { ...state, openGuess: null, lastResolved: event.guess, score: event.score }
+      : state;
   }
 
   return { ...state, openGuess: hold(state.openGuess, event.guess, at), placing: false };
@@ -79,7 +90,14 @@ export function reduce(state: GameState, action: Action): GameState {
   }
 
   if (action.type === "guessAnswered") {
-    return { ...state, openGuess: hold(state.openGuess, action.guess, action.at), placing: false };
+    // The Guess may have resolved before its answer arrived; then the result already shows.
+    const resolved = state.lastResolved?.id === action.guess.id;
+
+    return {
+      ...state,
+      openGuess: resolved ? state.openGuess : hold(state.openGuess, action.guess, action.at),
+      placing: false,
+    };
   }
 
   return { ...state, placing: false, message: messageFor(action.error) };

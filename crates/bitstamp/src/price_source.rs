@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt as _, StreamExt as _};
-use prices::{Price, PriceSource, Report};
+use prices::{Price, PriceSource, Report, TradeId};
 use rustls::ClientConfig;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
@@ -138,8 +138,8 @@ impl Feed {
         }
     }
 
-    fn received(&self, price: Price) {
-        self.report(Report::Received(price));
+    fn received(&self, price: Price, trade: Option<TradeId>) {
+        self.report(Report::Received(price, trade));
     }
 
     fn report(&self, report: Report) {
@@ -306,10 +306,10 @@ async fn follow(
                     Some(Ok(_)) => continue,
                 };
                 match message::parse(&text) {
-                    Ok(Message::Trade(price)) => {
+                    Ok(Message::Trade(price, trade)) => {
                         traded = true;
                         silence_ends = Instant::now() + config.silence_limit;
-                        feed.received(price);
+                        feed.received(price, trade);
                     }
                     Ok(Message::HeartbeatAnswered) => answer_due = None,
                     Ok(Message::RequestReconnect) => {
@@ -343,7 +343,8 @@ async fn follow(
                 seed = None;
                 match seeded {
                     // A trade received meanwhile is newer than the ticker's `last`.
-                    Ok(Ok(price)) if !traded => feed.received(price),
+                    // The seed is no trade, so it has no trade id.
+                    Ok(Ok(price)) if !traded => feed.received(price, None),
                     Ok(Ok(_)) => {}
                     Ok(Err(error)) => tracing::warn!("no seed from Bitstamp's ticker: {error}"),
                     Err(_) => tracing::warn!("no seed from Bitstamp's ticker: it did not answer in time"),

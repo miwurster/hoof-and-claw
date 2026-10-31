@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { formatDifference, formatPrice, formatScore, formatSeconds } from "./format";
+import { formatDifference, formatPrice, formatScore, formatScoreChange, formatSeconds } from "./format";
 
 test("a price is formatted in US dollars with cents", () => {
   expect(formatPrice(6_741_218)).toBe("$67,412.18");
@@ -10,6 +10,11 @@ test("a price is formatted in US dollars with cents", () => {
 
 test("no price yet is a dash", () => {
   expect(formatPrice(null)).toBe("—");
+});
+
+test("a Score change has its sign, a true minus sign when it falls", () => {
+  expect(formatScoreChange(1)).toBe("Score +1");
+  expect(formatScoreChange(-1)).toBe("Score −1");
 });
 
 test("a negative Score has a true minus sign", () => {

@@ -16,6 +16,9 @@ export type Direction = "Up" | "Down";
 /** Why the server refuses a Guess, or a visitor. */
 export type Refusal = "openGuessExists" | "priceDelayed" | "invalidDirection" | "badRequest" | "rateLimited";
 
+/** The result of a Resolved guess. */
+export type Outcome = "Correct" | "Wrong";
+
 /** Whether the Open guess would be Correct if it resolved at the latest price, or neither while the price is unchanged. */
 export type Standing = "Correct" | "Wrong" | "Unchanged";
 
@@ -26,6 +29,8 @@ export type Standing = "Correct" | "Wrong" | "Unchanged";
 export type PlayerDriver = {
   readonly opensAnUnknownPage: () => Promise<void>;
   readonly opensTheGame: () => Promise<void>;
+  /** Closes every page or stream of the game, so the Player has none open. */
+  readonly closesTheGame: () => Promise<void>;
   readonly expectsTheGame: () => Promise<void>;
   readonly expectsPrice: (price: string | null) => Promise<void>;
   readonly expectsPriceDelayed: (delayed: boolean) => Promise<void>;
@@ -57,6 +62,12 @@ export type PlayerDriver = {
   readonly expectsSecondsLeft: (seconds: number) => Promise<void>;
   readonly expectsDifference: (difference: string, standing: Standing) => Promise<void>;
   readonly expectsWaitingForThePriceToMove: () => Promise<void>;
+  /** The result of the most recent Resolved guess is shown: its Outcome, Start price, End price and Score change. */
+  readonly expectsResult: (outcome: Outcome, startPrice: string, endPrice: string) => Promise<void>;
+  /** No result of a Resolved guess is shown. */
+  readonly expectsNoResult: () => Promise<void>;
+  /** A screen reader is told the Outcome politely, and never the running price. */
+  readonly expectsOutcomeAnnounced: (outcome: Outcome) => Promise<void>;
   readonly expectsNoSecondGuess: () => Promise<void>;
   readonly expectsRefusal: (refusal: Refusal) => Promise<void>;
   readonly expectsEverythingByRoleAndName: () => Promise<void>;

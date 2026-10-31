@@ -26,7 +26,8 @@ use tower_governor::governor::GovernorConfigBuilder;
 pub use client_ip::ClientIp;
 pub use error::{ErrorBody, ErrorCode};
 pub use event::{
-    Direction, GuessPlaced, OpenGuess, Outcome, PriceChanged, ResolvedGuess, ServerEvent, Snapshot,
+    Direction, GuessPlaced, GuessResolved, OpenGuess, Outcome, PriceChanged, ResolvedGuess,
+    ServerEvent, Snapshot,
 };
 pub use guess::PlaceGuess;
 pub use health::Health;

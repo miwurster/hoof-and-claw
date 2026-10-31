@@ -3,8 +3,9 @@ import { expect } from "@playwright/test";
 import type { APIRequest, APIRequestContext, APIResponse, Browser } from "@playwright/test";
 import type { ErrorBody, ErrorCode, OpenGuess, PlaceGuess } from "contract";
 
-import { apply, cents, decode, FORWARDED_FOR, heldOpen, read, wire } from "./stream";
+import { apply, cents, decode, FORWARDED_FOR, heldOpen, outcome, read, shownResult, wire } from "./stream";
 import type { View } from "./stream";
+import { WithoutAPage } from "./without-a-page";
 
 export { apiServer } from "./server";
 
@@ -19,10 +20,10 @@ type Connection = {
 };
 
 /** A Player's HTTP client with its own identity cookie and streams, from its own network. */
-class ApiPlayer {
-  private readonly view: View = { price: null, delayed: true, score: 0, openGuess: null };
-  private readonly streams = new AbortController();
-  private readonly reading: Promise<void>[] = [];
+class ApiPlayer extends WithoutAPage {
+  private readonly view: View = { price: null, delayed: true, score: 0, openGuess: null, lastResolved: null };
+  private streams = new AbortController();
+  private reading: Promise<void>[] = [];
   private snapshots = 0;
   private lastPage: APIResponse | undefined;
   private identity: string | undefined;
@@ -33,7 +34,9 @@ class ApiPlayer {
     private readonly baseURL: string,
     private readonly network: string,
     private readonly request: APIRequestContext,
-  ) {}
+  ) {
+    super();
+  }
 
   async opensAnUnknownPage(): Promise<void> {
     this.lastPage = await this.request.get(UNKNOWN_PAGE);
@@ -70,18 +73,19 @@ class ApiPlayer {
     await expect.poll(() => this.snapshots, "the stream should open with a snapshot").toBeGreaterThan(opened);
   }
 
+  /** Ends every stream the Player holds open. */
+  async closesTheGame(): Promise<void> {
+    this.streams.abort();
+    await Promise.all(this.reading);
+    this.streams = new AbortController();
+    this.reading = [];
+    this.snapshots = 0;
+  }
+
   async guesses(direction: "Up" | "Down"): Promise<void> {
     const command: PlaceGuess = { direction: wire(direction) };
 
     await this.place(JSON.stringify(command), "application/json");
-  }
-
-  startsToGuess(): Promise<void> {
-    return Promise.reject(new Error("the API has no buttons to disable while a Guess is being placed"));
-  }
-
-  receivesTheAnswer(): Promise<void> {
-    return Promise.reject(new Error("the API has no buttons to disable while a Guess is being placed"));
   }
 
   async guessesWithAPriceAndTimeOfTheirOwn(direction: "Up" | "Down"): Promise<void> {
@@ -111,14 +115,6 @@ class ApiPlayer {
     await this.place(JSON.stringify(command), "text/plain");
   }
 
-  movesTheFocusTo(): Promise<void> {
-    return Promise.reject(new Error("the API has no keyboard focus"));
-  }
-
-  pressesEnter(): Promise<void> {
-    return Promise.reject(new Error("the API has no keyboard"));
-  }
-
   async expectsTheGame(): Promise<void> {
     expect(this.lastPage?.status(), "the page should load").toBe(200);
     expect(this.lastPage?.headers()["content-type"]).toContain("text/html");
@@ -146,7 +142,7 @@ class ApiPlayer {
 
   async expectsScore(score: number): Promise<void> {
     await this.streamOpened();
-    expect(this.view.score).toBe(score);
+    await expect.poll(() => this.view.score, `the Player should have Score ${String(score)}`).toBe(score);
   }
 
   async expectsNoOpenGuess(): Promise<void> {
@@ -168,12 +164,19 @@ class ApiPlayer {
     await expect.poll(() => this.view.openGuess?.remainingMs).toBe(seconds * 1000);
   }
 
-  expectsDifference(): Promise<void> {
-    return Promise.reject(new Error("the API carries no difference from the Start price; only the page shows it"));
+  /** The result shows while the Player holds no Open guess, as the page shows it. */
+  async expectsResult(shown: "Correct" | "Wrong", startPrice: string, endPrice: string): Promise<void> {
+    await expect
+      .poll(() => shownResult(this.view), `the Guess should have resolved ${shown} from ${startPrice} to ${endPrice}`)
+      .toEqual({ outcome: outcome(shown), start: cents(startPrice), end: cents(endPrice) });
   }
 
-  expectsWaitingForThePriceToMove(): Promise<void> {
-    return Promise.reject(new Error("the API has no waiting label; only the page shows it"));
+  async expectsNoResult(): Promise<void> {
+    await this.streamOpened();
+    expect(
+      this.view.openGuess !== null || this.view.lastResolved === null,
+      "no result of a Resolved guess should show",
+    ).toBe(true);
   }
 
   /** The API has no buttons; a Guess can be placed while the stream shows a live price and no Open guess. */
@@ -222,15 +225,6 @@ class ApiPlayer {
 
     return Promise.resolve();
   }
-
-  expectsAnnouncement = (): Promise<void> => Promise.reject(new Error("the API has no screen reader"));
-
-  expectsWhereTheScoreLives = (): Promise<void> => Promise.reject(new Error("the API has no page"));
-
-  expectsEverythingByRoleAndName = (): Promise<void> =>
-    Promise.reject(new Error("the API has no roles or accessible names"));
-
-  expectsHornFocusRing = (): Promise<void> => Promise.reject(new Error("the API has no focus ring"));
 
   async close(): Promise<void> {
     this.streams.abort();

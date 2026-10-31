@@ -11,7 +11,7 @@ use std::time::Duration;
 use bitstamp::{Bitstamp, Config};
 use fake_bitstamp::FakeBitstamp;
 use prices::source::suite::{self, Driver};
-use prices::{Price, PriceSource, Report};
+use prices::{Price, PriceSource, Report, TradeId};
 
 /// Short enough that a test about heartbeats, silence or backoff runs in well under a second or two.
 fn config(fake: &FakeBitstamp) -> Config {
@@ -106,8 +106,14 @@ async fn reports_nothing_for(source: &mut Bitstamp, duration: Duration) {
     }
 }
 
-fn received(cents: u64) -> Report {
-    Report::Received(Price::from_cents(cents))
+/// A price received with no trade id, as the seed is.
+fn seeded(cents: u64) -> Report {
+    Report::Received(Price::from_cents(cents), None)
+}
+
+/// A price received from the trade with this id.
+fn traded(cents: u64, id: u64) -> Report {
+    Report::Received(Price::from_cents(cents), Some(TradeId::new(id)))
 }
 
 async fn live_without_seed(fake: &FakeBitstamp) -> (Bitstamp, bitstamp::Shutdown) {
@@ -124,7 +130,7 @@ async fn after_subscribing_the_adapter_reads_the_ticker_once_and_delivers_last()
     let (mut source, _shutdown) = start(&fake);
 
     assert_eq!(next(&mut source).await, Some(Report::Live));
-    assert_eq!(next(&mut source).await, Some(received(6_400_012)));
+    assert_eq!(next(&mut source).await, Some(seeded(6_400_012)));
     fake.wait_for_heartbeats(3).await;
     assert_eq!(fake.ticker_reads(), 1);
 }
@@ -136,7 +142,23 @@ async fn a_trade_is_received_in_cents_from_its_price_str() {
 
     fake.trades(1, "64000.5");
 
-    assert_eq!(next(&mut source).await, Some(received(6_400_050)));
+    assert_eq!(next(&mut source).await, Some(traded(6_400_050, 1)));
+}
+
+#[tokio::test]
+async fn a_trade_is_received_with_its_trade_id_and_the_seed_with_none() {
+    let fake = FakeBitstamp::start().await;
+    fake.set_ticker(Some("64000.12"));
+    let (mut source, _shutdown) = start(&fake);
+    assert_eq!(next(&mut source).await, Some(Report::Live));
+    assert_eq!(next(&mut source).await, Some(seeded(6_400_012)));
+
+    fake.trades(417_000_123, "64000.50");
+
+    assert_eq!(
+        next(&mut source).await,
+        Some(traded(6_400_050, 417_000_123))
+    );
 }
 
 #[tokio::test]
@@ -147,7 +169,7 @@ async fn a_trade_with_more_than_two_decimal_places_is_not_received() {
     fake.trades(1, "64000.123");
     fake.trades(2, "64000.13");
 
-    assert_eq!(next(&mut source).await, Some(received(6_400_013)));
+    assert_eq!(next(&mut source).await, Some(traded(6_400_013, 2)));
 }
 
 #[tokio::test]
@@ -198,13 +220,13 @@ async fn after_the_silence_limit_without_a_trade_the_adapter_reconnects_and_seed
     fake.set_ticker(Some("64000.00"));
     let (mut source, _shutdown) = start(&fake);
     assert_eq!(next(&mut source).await, Some(Report::Live));
-    assert_eq!(next(&mut source).await, Some(received(6_400_000)));
+    assert_eq!(next(&mut source).await, Some(seeded(6_400_000)));
 
     fake.set_ticker(Some("64001.00"));
 
     assert_eq!(next(&mut source).await, Some(Report::Delayed));
     assert_eq!(next(&mut source).await, Some(Report::Live));
-    assert_eq!(next(&mut source).await, Some(received(6_400_100)));
+    assert_eq!(next(&mut source).await, Some(seeded(6_400_100)));
     assert_eq!(fake.opened(), 2);
     assert_eq!(fake.ticker_reads(), 2);
 }
@@ -216,7 +238,7 @@ async fn trades_keep_a_quiet_subscription_from_counting_as_silent() {
 
     for id in 0..15 {
         fake.trades(id, "64000.00");
-        assert_eq!(next(&mut source).await, Some(received(6_400_000)));
+        assert_eq!(next(&mut source).await, Some(traded(6_400_000, id)));
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
 
@@ -231,14 +253,14 @@ async fn on_a_reconnect_request_the_adapter_subscribes_a_new_connection_before_i
     fake.set_ticker(Some("64000.00"));
     let (mut source, _shutdown) = start(&fake);
     assert_eq!(next(&mut source).await, Some(Report::Live));
-    assert_eq!(next(&mut source).await, Some(received(6_400_000)));
+    assert_eq!(next(&mut source).await, Some(seeded(6_400_000)));
     fake.set_ticker(Some("64000.50"));
 
     fake.requests_reconnect();
 
-    assert_eq!(next(&mut source).await, Some(received(6_400_050)));
+    assert_eq!(next(&mut source).await, Some(seeded(6_400_050)));
     fake.trades(1, "64001.00");
-    assert_eq!(next(&mut source).await, Some(received(6_400_100)));
+    assert_eq!(next(&mut source).await, Some(traded(6_400_100, 1)));
     assert_eq!(
         fake.happened(),
         [

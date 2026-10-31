@@ -1,4 +1,4 @@
-import type { OpenGuess, ServerEvent } from "contract";
+import type { OpenGuess, ResolvedGuess, ServerEvent } from "contract";
 import { expect, test } from "vitest";
 
 import { canGuess, initialState, reduce } from "./reducer";
@@ -17,6 +17,14 @@ const snapshot: ServerEvent = {
 
 const guess: OpenGuess = { id: "guess-1", direction: "up", startPrice: 6_400_000, remainingMs: 60_000 };
 
+const resolved: ResolvedGuess = {
+  id: "guess-1",
+  direction: "up",
+  startPrice: 6_400_000,
+  endPrice: 6_401_000,
+  outcome: "correct",
+};
+
 function received(event: ServerEvent, at = 0): Action {
   return { type: "received", event, at };
 }
@@ -31,6 +39,7 @@ test("before the stream opens, there is no price, the price is delayed and the S
     delayed: true,
     score: 0,
     openGuess: null,
+    lastResolved: null,
     placing: false,
     message: null,
   });
@@ -146,4 +155,55 @@ test("pressing again clears the last message", () => {
   );
 
   expect(state.message).toBeNull();
+});
+
+test("a snapshot carries the most recent Resolved guess, for a Player who was away when it resolved", () => {
+  const state = run(received({ ...snapshot, score: 1, lastResolved: resolved }));
+
+  expect(state.lastResolved).toEqual(resolved);
+  expect(state.score).toBe(1);
+});
+
+test("the Open guess resolving ends it, shows its result and sets the new Score", () => {
+  const state = run(received(snapshot), received({ type: "guessPlaced", guess }), {
+    type: "received",
+    event: { type: "guessResolved", guess: resolved, score: 1 },
+    at: 61_000,
+  });
+
+  expect(state.openGuess).toBeNull();
+  expect(state.lastResolved).toEqual(resolved);
+  expect(state.score).toBe(1);
+  expect(canGuess(state)).toBe(true);
+});
+
+test("a resolution for a Guess the page does not hold as open changes nothing", () => {
+  const before = run(received({ ...snapshot, score: 1, lastResolved: resolved }));
+
+  const after = reduce(before, received({ type: "guessResolved", guess: resolved, score: 1 }));
+
+  expect(after).toEqual(before);
+});
+
+test("the result stays when the next Guess is placed, beneath it", () => {
+  const next: OpenGuess = { ...guess, id: "guess-2" };
+
+  const state = run(received({ ...snapshot, lastResolved: resolved }), received({ type: "guessPlaced", guess: next }));
+
+  expect(state.openGuess?.guess).toEqual(next);
+  expect(state.lastResolved).toEqual(resolved);
+});
+
+test("an answer that arrives after its Guess resolved does not open it again", () => {
+  const state = run(
+    received(snapshot),
+    { type: "guessing" },
+    received({ type: "guessPlaced", guess }),
+    received({ type: "guessResolved", guess: resolved, score: 1 }),
+    { type: "guessAnswered", guess, at: 1_000 },
+  );
+
+  expect(state.openGuess).toBeNull();
+  expect(state.lastResolved).toEqual(resolved);
+  expect(state.placing).toBe(false);
 });

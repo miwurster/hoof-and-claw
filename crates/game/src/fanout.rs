@@ -10,7 +10,7 @@ mod recording;
 )]
 pub mod suite;
 
-use guessing::PlayerId;
+use guessing::{PlayerId, Resolution};
 use prices::LatestPrice;
 use tokio::sync::{mpsc, watch};
 
@@ -26,6 +26,8 @@ pub const PLAYER_EVENT_QUEUE: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlayerEvent {
     GuessPlaced(Open),
+    /// The Player's Guess resolved, with their Score after it.
+    GuessResolved(Resolution),
 }
 
 /// What one stream receives.

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source\n             FROM guesses WHERE player_id = ? AND state = 'open'",
+  "query": "SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id\n             FROM guesses WHERE player_id = ? AND state = 'open'",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,17 @@
             "name": "start_source"
           }
         }
+      },
+      {
+        "name": "start_trade_id",
+        "ordinal": 6,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_trade_id"
+          }
+        }
       }
     ],
     "parameters": {
@@ -79,8 +90,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "bdfa0731ea11f9c335def5818d0066198914c27baac1109686b909126f64d6d2"
+  "hash": "4fcae6efd87e94d96920f08ce059e36f748b9c390c895609848ac963aefbae3e"
 }

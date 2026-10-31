@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE guesses\n                 SET state = 'resolved', end_price_cents = ?, end_received_at = ?, end_source = ?, end_trade_id = ?,\n                     outcome = ?, resolved_at = ?\n                 WHERE id = ? AND state = 'open'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "6257d57bffec6a6f3796f4d3351276566dc46590cff0fbbee301eb555b23a3e7"
+}

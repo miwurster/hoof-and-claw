@@ -11,6 +11,7 @@ pub enum ServerEvent {
     Snapshot(Snapshot),
     Price(PriceChanged),
     GuessPlaced(GuessPlaced),
+    GuessResolved(GuessResolved),
 }
 
 /// Everything a tab shows, sent first on every stream and answered by `GET /api/snapshot`.
@@ -48,6 +49,16 @@ pub struct PriceChanged {
 #[ts(export)]
 pub struct GuessPlaced {
     pub guess: OpenGuess,
+}
+
+/// The Player's Guess resolved, with their Score after it.
+#[derive(Clone, Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct GuessResolved {
+    pub guess: ResolvedGuess,
+    #[ts(type = "number")]
+    pub score: i64,
 }
 
 /// A Player's Open guess.
@@ -133,12 +144,37 @@ impl From<game::Open> for OpenGuess {
     }
 }
 
+impl From<guessing::Outcome> for Outcome {
+    fn from(outcome: guessing::Outcome) -> Self {
+        match outcome {
+            guessing::Outcome::Correct => Self::Correct,
+            guessing::Outcome::Wrong => Self::Wrong,
+        }
+    }
+}
+
+impl From<guessing::ResolvedGuess> for ResolvedGuess {
+    fn from(resolved: guessing::ResolvedGuess) -> Self {
+        Self {
+            id: resolved.guess.id.to_string(),
+            direction: resolved.guess.direction.into(),
+            start_price: resolved.guess.start.price.cents(),
+            end_price: resolved.end.price.cents(),
+            outcome: resolved.outcome.into(),
+        }
+    }
+}
+
 impl From<game::PlayerEvent> for ServerEvent {
     fn from(event: game::PlayerEvent) -> Self {
         match event {
             game::PlayerEvent::GuessPlaced(open) => {
                 Self::GuessPlaced(GuessPlaced { guess: open.into() })
             }
+            game::PlayerEvent::GuessResolved(resolution) => Self::GuessResolved(GuessResolved {
+                guess: resolution.guess.into(),
+                score: resolution.score.value(),
+            }),
         }
     }
 }

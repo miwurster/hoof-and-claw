@@ -1,0 +1,71 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-turf);
+  text-align: center;
+}
+
+.card p {
+  margin: 0;
+}
+
+.up {
+  color: var(--color-pasture);
+}
+
+.down {
+  color: var(--color-rust);
+}
+
+/* A hoof print in Pasture for a price that went up, a claw mark in Rust for one that went down. */
+.stamp {
+  width: var(--size-stamp);
+  height: var(--size-stamp);
+}
+
+.outcome {
+  font-weight: var(--font-weight-wordmark);
+}
+
+.change,
+.prices {
+  font-variant-numeric: tabular-nums;
+}
+
+.prices {
+  color: var(--color-flint);
+  font-size: var(--font-size-small);
+}
+
+/* The only choreographed animation: the stamp lands, and the Score change ticks in time with it. */
+.landing {
+  animation: land var(--duration-stamp) ease-in both;
+}
+
+.ticking {
+  animation: tick var(--duration-stamp) steps(2, jump-none) both;
+}
+
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: scale(var(--scale-stamp-lifted)) rotate(-12deg);
+  }
+}
+
+@keyframes tick {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing,
+  .ticking {
+    animation: none;
+  }
+}
