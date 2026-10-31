@@ -129,4 +129,4 @@ The rules of the brief form the first set: the visible Score and price, one gues
 - `docs/agents/verification.md` drives the app through the same control channels, and runs a covered criterion's test case alone.
   It drives an uncovered criterion with `curl` and a browser rather than the DSL, because verification writes nothing to the repo.
 - The worker fixture and `docs/agents/verification.md` start the server with the same task, `mise run launch`.
-  It builds in the Cargo profile `gate`, which the performance cases share (ADR 0014).
+  It builds in the Cargo profile `gate`, which the performance cases share (ADR 0015).

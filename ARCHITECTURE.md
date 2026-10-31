@@ -103,7 +103,7 @@ A Playwright Test package in Dave Farley's four layers, one folder each:
 | Folder              | Holds                                                                            | May import                                         |
 | ------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- |
 | `cases/`            | test cases in glossary terms                                                     | `dsl/`                                             |
-| `performance/`      | performance cases with their budgets (ADR 0014)                                  | `dsl/`                                             |
+| `performance/`      | performance cases with their budgets (ADR 0015)                                  | `dsl/`                                             |
 | `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`) and their `should` assertions | the driver interface                               |
 | `drivers/ui/`       | the driver for the SPA in a browser                                              | Playwright                                         |
 | `drivers/api/`      | the driver for the HTTP API and the SSE stream                                   | Playwright's request API, `contract/`              |
@@ -112,7 +112,7 @@ A Playwright Test package in Dave Farley's four layers, one folder each:
 No driver imports another; enforced by `acceptance/.dependency-cruiser.cjs`.
 Every case runs in the Playwright projects `ui` and `api`; a case limited to one carries that project's tag with the reason beside it.
 Each worker starts its own server with `mise run launch` on port 0 and its own SQLite file.
-The performance cases run in the project `performance`, with one worker and only the API driver, after the other projects (ADR 0014).
+The performance cases run in the project `performance`, with one worker and only the API driver, after the other projects (ADR 0015).
 
 ## Tests
 
@@ -123,6 +123,6 @@ The performance cases run in the project `performance`, with one worker and only
 | `game`                                     | `game`'s tests with the fakes and the recording `Fanout` | `cargo-nextest`                |
 | Reducer, hook, presentational components   | beside the code in `spa/`                                | Vitest, Testing Library        |
 | The whole app through its public interface | `acceptance/`                                            | Playwright                     |
-| Performance budgets under load (ADR 0014)  | `acceptance/performance/`, project `performance`         | Playwright, `hdr-histogram-js` |
+| Performance budgets under load (ADR 0015)  | `acceptance/performance/`, project `performance`         | Playwright, `hdr-histogram-js` |
 
 Fakes are hand-written; there is no `mockall` and no module mocking.

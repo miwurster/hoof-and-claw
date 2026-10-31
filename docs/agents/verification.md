@@ -9,7 +9,7 @@ Read the routes from the code, not from this file: the game's routes from the ro
 
 ## Launch
 
-`PORT=<port> DATABASE_PATH=<file> mise run launch` builds the SPA and `server` with the Cargo feature `test-controls` in the Cargo profile `gate` (ADR 0014) and starts the server on an empty SQLite file, migrations included.
+`PORT=<port> DATABASE_PATH=<file> mise run launch` builds the SPA and `server` with the Cargo feature `test-controls` in the Cargo profile `gate` (ADR 0015) and starts the server on an empty SQLite file, migrations included.
 It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the commit it was built from.
 
 - **Ready signal:** the server logs `listening on <address>` once migrations ran; `GET /health` then answers 200.
