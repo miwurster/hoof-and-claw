@@ -28,7 +28,7 @@ Bitstamp's WebSocket docs page (`https://www.bitstamp.net/websocket/v2/`) blocks
   Each tab holds one latest-value slot for the price, not a queue, so a client that cannot keep up skips intermediate prices and always gets the current one.
   Memory and bandwidth per client therefore do not grow with the trade rate.
   The server never drops a Player's resolution events, and they do not share that slot.
-  "Real-time architecture and scale path" decides whether the price stream also gets a fixed cap per tab.
+  On top of that, one server-wide throttle sends at most one price event a second (ADR 0010).
 - **Seed on connect.** Right after subscribing, the server calls the REST ticker once and treats `last` as a received price like any trade.
   It can serve as a Start price, or as the End price of a guess that fell due during an outage, because it is the current last trade, not a backfilled one.
 - **Healthy.** The connection counts as healthy while it is open, `bts:subscription_succeeded` has arrived, and every heartbeat, sent every 10 s, is answered within 5 s.

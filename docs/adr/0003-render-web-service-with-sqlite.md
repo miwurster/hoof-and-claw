@@ -30,7 +30,7 @@ One always-on process is the simplest design that meets every rule of the brief,
 - Every deploy briefly takes the game down, and so does every platform maintenance window, which Render announces and holds at most about once every three months.
   Open guesses survive, because the server persists a guess before it acknowledges it, and they resolve on the first changed price after the restart (see ADR 0002).
 - SSE streams and the feed close on every deploy.
-  Clients reconnect and re-read their state over HTTP, and the server sends SSE heartbeats, because Render documents no timeout for streaming responses.
+  Clients reconnect and rebuild their state from the snapshot that opens every stream (ADR 0010), and the server sends SSE heartbeats, because Render documents no timeout for streaming responses.
   The acceptance suite holds an SSE stream open for more than an hour against the deployed service.
 - The server pushes at most one price per second to browsers, and only when it changed.
   Resolution still uses every price it receives.

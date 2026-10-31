@@ -15,7 +15,7 @@ All crates sit flat under `crates/` in a virtual workspace.
 | `prices` | core, sync | Price, Price source, the latest price, Price delayed, the `PriceSource` port | `thiserror`, pure crates |
 | `guessing` | core, sync | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due guesses, its store port | `prices`, `thiserror`, pure crates |
 | `identity` | core, sync | issuing and checking the anonymous token, token to Player ID, its store port | `guessing`, `thiserror`, pure crates |
-| `game` | shell, async | the running game: takes prices from `PriceSource`, runs the cores, persists before it acknowledges, fans events out to the SSE streams; owns the `Clock` port | the cores, `tokio` |
+| `game` | shell, async | the running game: takes prices from `PriceSource`, runs the cores, persists before it acknowledges, fans events out to the SSE streams; owns the `Clock` and `Fanout` ports | the cores, `tokio` |
 | `bitstamp` | adapter | `PriceSource` over Bitstamp's WebSocket feed and REST seed (ADR 0007) | `prices`, `tokio`, `tokio-tungstenite`, `rustls` |
 | `sqlite` | adapter | every core's store port on one database file and one write connection | the cores, `sqlx` |
 | `web` | adapter | axum routes, the SSE stream, the identity cookie, static files | `game`, the cores, `axum`, `tower-http` |
@@ -27,7 +27,7 @@ Inside a crate, modules are named after glossary terms (`guess.rs`, `score.rs`),
 
 ## Ports
 
-There are four ports.
+There are five ports.
 Each has a real adapter and a test adapter, so something varies across every seam.
 
 - **`PriceSource` in `prices`.** It delivers a stream of received prices, each with its Price source, server receipt time and trade id, and of changes between live and Price delayed.
@@ -43,8 +43,9 @@ Each has a real adapter and a test adapter, so something varies across every sea
 - **Identity in `identity`.** It turns a token into a Player ID, or issues a new one.
   The cookie handling around it stays in `web` (ADR 0001).
 
-The SSE fan-out is an in-process broadcast inside `game` and no port, because it has one implementation.
-"Real-time architecture and scale path" may add a port for it when a second implementation exists.
+- **`Fanout` in `game`.** It publishes prices to every open SSE stream and a Player's events to that Player's streams (ADR 0010).
+  Adapters: an in-process broadcast in `game` and a recording fake for `game`'s tests.
+  Both pass one shared test suite.
 
 ## The first Guess across two areas
 

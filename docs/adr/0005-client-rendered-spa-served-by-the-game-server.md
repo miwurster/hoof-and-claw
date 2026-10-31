@@ -30,7 +30,7 @@ A second server that renders pages would show a price that is a second old by th
 - **Transport.** Each tab opens one SSE stream that carries prices and the events of its own Player, identified by the cookie.
   The server pushes a resolution event with the Outcome, End price and new Score the moment it resolves a guess, so the client never polls.
   HTTP is used for reading the Player's current state and for placing a Guess.
-  After a reconnect the client reads its state over HTTP again (ADR 0003).
+  The first event on every stream is a snapshot of the Player's state, so after a reconnect the client rebuilds its state from it (ADR 0010).
 - **Countdown.** The server sends the time remaining on the Open guess, or its due time together with the server's current time.
   The client counts down from when it received that message and never compares against its own clock.
   At zero the UI shows "Waiting for the price to move…" and decides nothing itself; only the server's resolution event ends the Open guess.
