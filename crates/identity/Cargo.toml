@@ -7,7 +7,13 @@ publish.workspace = true
 
 [dependencies]
 base64.workspace = true
+guessing.workspace = true
+jiff.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+futures-executor.workspace = true
 
 [lints]
 workspace = true

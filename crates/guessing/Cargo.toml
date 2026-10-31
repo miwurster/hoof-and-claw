@@ -1,0 +1,18 @@
+[package]
+name = "guessing"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+jiff.workspace = true
+prices.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+futures-executor.workspace = true
+
+[lints]
+workspace = true

@@ -31,7 +31,13 @@
 
   /* Sizes */
   --size-mark: 2rem;
+  --size-ring: 6rem;
+  --width-ring: 6;
   --width-column: 28rem;
+
+  /* Motion */
+  --duration-pulse: 2s;
+  --opacity-pulse: 0.4;
 
   /* Keyboard focus: Horn only */
   --focus-ring: 2px solid var(--color-horn);

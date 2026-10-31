@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT score FROM players WHERE id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "score",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "players",
+            "name": "score"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "caa60736e7d4425a9110c447f44ed41b7392a8dd9baed374ccf232bc40d9f192"
+}

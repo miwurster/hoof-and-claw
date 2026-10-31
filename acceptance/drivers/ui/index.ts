@@ -1,15 +1,42 @@
 // The UI driver: a Player's page in Chromium, found by role and accessible name.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { expect } from "@playwright/test";
-import type { APIRequest, Browser, BrowserContext, Page } from "@playwright/test";
+import type { APIRequest, Browser, BrowserContext, Locator, Page, Route } from "@playwright/test";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
 const IDENTITY = "__Host-player";
+const GUESSES = "**/api/guesses";
+
+/** The design token each standing of the difference is coloured with (docs/design/visual-direction.md). */
+const STANDING_COLOUR = { Correct: "--color-pasture", Wrong: "--color-rust", Unchanged: "--color-flint" } as const;
+
+/** The one refusal the page tells the Player about; for the others the page already shows why. */
+const RATE_LIMITED = "Too many guesses from your network. Try again in a minute.";
 
 type Connection = {
   readonly baseURL: string;
   readonly browser: Browser;
   readonly request: APIRequest;
+  readonly network: string;
 };
+
+/** The design tokens' stylesheet, the one place that names the page's colours. */
+const TOKENS = readFileSync(join(import.meta.dirname, "..", "..", "..", "spa", "src", "styles", "tokens.css"), "utf8");
+
+/** A colour token as `getComputedStyle` writes it, such as `rgb(212, 178, 106)`. */
+function colour(token: string): string {
+  const hex = new RegExp(`${token}:\\s*#([0-9a-f]{6});`, "iu").exec(TOKENS)?.[1];
+
+  if (hex === undefined) {
+    throw new Error(`the token stylesheet has no colour ${token}`);
+  }
+
+  const [red, green, blue] = [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
+
+  return `rgb(${String(red)}, ${String(green)}, ${String(blue)})`;
+}
 
 /** A dollar string such as "64,000.00" as the page shows it, or the dash for no price. */
 function shown(price: string | null): string {
@@ -20,6 +47,8 @@ function shown(price: string | null): string {
 class UiPlayer {
   private readonly price;
   private readonly announcement;
+  private readonly openGuess;
+  private held: Promise<Route> | undefined;
 
   constructor(
     private readonly context: BrowserContext,
@@ -27,6 +56,75 @@ class UiPlayer {
   ) {
     this.price = page.getByRole("region", { name: "BTC/USD price" });
     this.announcement = this.price.getByRole("status");
+    this.openGuess = page.getByRole("region", { name: "Open guess" });
+  }
+
+  private button(direction: "Up" | "Down"): Locator {
+    return this.page.getByRole("button", { name: direction, exact: true });
+  }
+
+  async opensThePage(): Promise<void> {
+    await this.page.goto("/");
+  }
+
+  async guesses(direction: "Up" | "Down"): Promise<void> {
+    await this.button(direction).click();
+  }
+
+  async startsToGuess(direction: "Up" | "Down"): Promise<void> {
+    let hold: ((route: Route) => void) | undefined;
+
+    this.held = new Promise<Route>((resolve) => {
+      hold = resolve;
+    });
+    await this.page.route(
+      GUESSES,
+      (route) => {
+        hold?.(route);
+      },
+      { times: 1 },
+    );
+    await this.button(direction).click();
+    await this.held;
+  }
+
+  async receivesTheAnswer(): Promise<void> {
+    const route = await this.held;
+
+    await route?.continue();
+    this.held = undefined;
+  }
+
+  guessesWithAPriceAndTimeOfTheirOwn(): Promise<void> {
+    return Promise.reject(new Error("the page sends only a Direction; only the API can carry a price or a time"));
+  }
+
+  guessesADirectionThatIsNeitherUpNorDown(): Promise<void> {
+    return Promise.reject(new Error("the page has only Up and Down"));
+  }
+
+  guessesWithABodyThatIsNotJson(): Promise<void> {
+    return Promise.reject(new Error("the page always sends JSON"));
+  }
+
+  guessesWithoutSayingTheBodyIsJson(): Promise<void> {
+    return Promise.reject(new Error("the page always sends JSON"));
+  }
+
+  async movesTheFocusTo(direction: "Up" | "Down"): Promise<void> {
+    const button = this.button(direction);
+
+    const focused = button.and(this.page.locator(":focus"));
+
+    for (let presses = 0; presses < 20 && (await focused.count()) === 0; presses += 1) {
+      await this.page.keyboard.press("Tab");
+    }
+
+    await expect(button, `${direction} should be reachable with Tab`).toBeFocused();
+  }
+
+  async pressesEnter(): Promise<void> {
+    await this.page.keyboard.press("Enter");
   }
 
   async opensAnUnknownPage(): Promise<void> {
@@ -69,6 +167,74 @@ class UiPlayer {
   async expectsNoOpenGuess(): Promise<void> {
     await expect(this.page.getByRole("region", { name: "Score" })).toBeVisible();
     await expect(this.page.getByRole("region", { name: "Open guess" })).toHaveCount(0);
+  }
+
+  async expectsOpenGuess(direction: "Up" | "Down", startPrice: string): Promise<void> {
+    await expect(this.openGuess).toContainText(direction);
+    await expect(this.openGuess).toContainText(`Start price ${shown(startPrice)}`);
+  }
+
+  /** The page counts down on its own clock, so the seconds may have moved on by a few by the time they are read. */
+  async expectsSecondsLeft(seconds: number): Promise<void> {
+    const left = async () => Number(/(\d+) seconds left/u.exec((await this.openGuess.textContent()) ?? "")?.[1]);
+    const message = `the Open guess should show about ${String(seconds)} seconds left`;
+
+    await expect.poll(left, message).toBeLessThanOrEqual(seconds);
+    await expect.poll(left, message).toBeGreaterThan(seconds - 3);
+  }
+
+  async expectsDifference(difference: string, standing: "Correct" | "Wrong" | "Unchanged"): Promise<void> {
+    const shownDifference = this.openGuess.getByText(difference, { exact: true });
+
+    await expect(shownDifference).toBeVisible();
+    await expect(shownDifference, `the difference should be coloured as ${standing}`).toHaveCSS(
+      "color",
+      colour(STANDING_COLOUR[standing]),
+    );
+  }
+
+  async expectsWaitingForThePriceToMove(): Promise<void> {
+    await expect(this.openGuess).toContainText("Waiting for the price to move…");
+  }
+
+  async expectsNoSecondGuess(): Promise<void> {
+    await expect(this.openGuess).toBeVisible();
+    await this.expectsGuessing(false);
+  }
+
+  async expectsRefusal(refusal: string): Promise<void> {
+    if (refusal !== "rateLimited") {
+      throw new Error(`the page shows no message for a Guess refused as ${refusal}`);
+    }
+
+    await expect(this.page.getByText(RATE_LIMITED, { exact: true })).toBeVisible();
+  }
+
+  async expectsEverythingByRoleAndName(): Promise<void> {
+    await expect(this.button("Up")).toBeVisible();
+    await expect(this.button("Down")).toBeVisible();
+    await expect(this.page.getByRole("region", { name: "Score" })).toBeVisible();
+    await expect(this.price).toBeVisible();
+    await expect(this.openGuess).toBeVisible();
+  }
+
+  async expectsHornFocusRing(direction: "Up" | "Down"): Promise<void> {
+    const button = this.button(direction);
+
+    await expect(button).toBeFocused();
+    await expect(button, "the focus ring should show").toHaveCSS("outline-style", "solid");
+    await expect(button, "the focus ring should show").not.toHaveCSS("outline-width", "0px");
+    await expect(button, "the focus ring should be Horn").toHaveCSS("outline-color", colour("--color-horn"));
+  }
+
+  async expectsNoIdentity(): Promise<void> {
+    const cookies = await this.context.cookies();
+
+    expect(cookies.find((cookie) => cookie.name === IDENTITY)).toBeUndefined();
+  }
+
+  expectsTurnedAway(): Promise<void> {
+    return Promise.reject(new Error("the page does not show why the game's API turned it away"));
   }
 
   async expectsGuessing(possible: boolean): Promise<void> {
@@ -114,7 +280,10 @@ class UiPlayer {
 }
 
 export async function uiPlayer(connection: Connection) {
-  const context = await connection.browser.newContext({ baseURL: connection.baseURL });
+  const context = await connection.browser.newContext({
+    baseURL: connection.baseURL,
+    extraHTTPHeaders: { "X-Forwarded-For": connection.network },
+  });
 
   return new UiPlayer(context, await context.newPage());
 }

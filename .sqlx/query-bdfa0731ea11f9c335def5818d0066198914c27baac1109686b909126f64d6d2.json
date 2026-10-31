@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source\n             FROM guesses WHERE player_id = ? AND state = 'open'",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "direction",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "direction"
+          }
+        }
+      },
+      {
+        "name": "placed_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "placed_at"
+          }
+        }
+      },
+      {
+        "name": "start_price_cents",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_price_cents"
+          }
+        }
+      },
+      {
+        "name": "start_received_at",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_received_at"
+          }
+        }
+      },
+      {
+        "name": "start_source",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "start_source"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bdfa0731ea11f9c335def5818d0066198914c27baac1109686b909126f64d6d2"
+}

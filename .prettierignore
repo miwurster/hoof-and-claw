@@ -6,5 +6,5 @@ pnpm-lock.yaml
 acceptance/test-results/
 acceptance/playwright-report/
 tools/oxlint/anti-slop/
-crates/sqlite/.sqlx/
+.sqlx/
 contract/src/

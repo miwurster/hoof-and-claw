@@ -3,4 +3,4 @@
 /**
  * The code of every error under `/api/` and `/test-controls/`.
  */
-export type ErrorCode = "badRequest" | "notFound" | "internal";
+export type ErrorCode = "openGuessExists" | "priceDelayed" | "invalidDirection" | "badRequest" | "notFound" | "rateLimited" | "internal";

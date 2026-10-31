@@ -4,6 +4,7 @@ import { execFileSync } from "node:child_process";
 import { test as base } from "@playwright/test";
 
 import type { Drivers } from "./drivers";
+import { freshNetwork } from "./network";
 import { Player } from "./player";
 import { Server } from "./server";
 
@@ -48,14 +49,24 @@ export const test = base.extend<Actors & Options>({
   ],
 
   alice: async ({ drivers, browser, playwright }, use) => {
-    const driver = await drivers.player({ baseURL: deployedURL, browser, request: playwright.request });
+    const driver = await drivers.player({
+      baseURL: deployedURL,
+      browser,
+      request: playwright.request,
+      network: freshNetwork(),
+    });
 
     await use(new Player("Alice", driver));
     await driver.close();
   },
 
   server: async ({ drivers, browser, playwright }, use) => {
-    const driver = await drivers.server({ baseURL: deployedURL, browser, request: playwright.request });
+    const driver = await drivers.server({
+      baseURL: deployedURL,
+      browser,
+      request: playwright.request,
+      network: freshNetwork(),
+    });
 
     await use(new Server(driver, releasedCommit()));
     await driver.close();

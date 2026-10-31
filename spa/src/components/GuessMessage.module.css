@@ -1,0 +1,6 @@
+.message {
+  display: block;
+  color: var(--color-flint);
+  font-size: var(--font-size-small);
+  text-align: center;
+}

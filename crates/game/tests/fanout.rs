@@ -27,6 +27,21 @@ macro_rules! shared_suite {
             async fn closing_ends_every_subscription() {
                 suite::closing_ends_every_subscription($new).await;
             }
+
+            #[tokio::test]
+            async fn a_players_event_reaches_every_stream_of_that_player_and_no_other() {
+                suite::a_players_event_reaches_every_stream_of_that_player_and_no_other($new).await;
+            }
+
+            #[tokio::test]
+            async fn a_player_gets_every_event_in_the_order_it_was_published() {
+                suite::a_player_gets_every_event_in_the_order_it_was_published($new).await;
+            }
+
+            #[tokio::test]
+            async fn a_stream_whose_queue_of_player_events_is_full_is_closed() {
+                suite::a_stream_whose_queue_of_player_events_is_full_is_closed($new).await;
+            }
         }
     };
 }

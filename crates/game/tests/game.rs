@@ -5,7 +5,10 @@ use std::time::Duration;
 use game::{Clock, Game, Recording};
 use jiff::Timestamp;
 use prices::{LatestPrice, Price, PriceSource, Report};
+use support::Stores;
 use tokio::sync::mpsc;
+
+mod support;
 
 /// 2026-10-31T12:00:00Z.
 const NOW: Timestamp = Timestamp::constant(1_793_448_000, 0);
@@ -28,7 +31,7 @@ impl PriceSource for FakeSource {
 }
 
 struct Running {
-    game: Game<FixedClock, Recording>,
+    game: Game<FixedClock, Recording, Stores>,
     fanout: Recording,
     reports: mpsc::UnboundedSender<Report>,
 }
@@ -36,7 +39,7 @@ struct Running {
 impl Running {
     fn start() -> Self {
         let fanout = Recording::new();
-        let game = Game::new(FixedClock(NOW), fanout.clone());
+        let game = Game::new(FixedClock(NOW), fanout.clone(), Stores::default());
         let (reports, receiver) = mpsc::unbounded_channel();
         tokio::spawn({
             let game = game.clone();
@@ -185,9 +188,9 @@ async fn a_change_between_live_and_price_delayed_is_published_at_once() {
 async fn the_snapshot_holds_the_latest_price_and_the_servers_time() {
     let running = Running::start();
 
-    let at_start = running.game.snapshot();
+    let at_start = running.game.snapshot(None).await.unwrap();
     running.live_at(6_400_000).await;
-    let live = running.game.snapshot();
+    let live = running.game.snapshot(None).await.unwrap();
 
     assert_eq!(at_start.latest, LatestPrice::default());
     assert_eq!(live.latest, latest(Some(6_400_000), false));
@@ -200,7 +203,7 @@ async fn the_snapshot_holds_the_latest_price_and_the_servers_time() {
 #[tokio::test(start_paused = true)]
 async fn ending_the_streams_closes_every_subscription() {
     let running = Running::start();
-    let mut subscription = running.game.subscribe();
+    let mut subscription = running.game.subscribe(None);
 
     running.game.end_streams();
 
@@ -218,7 +221,7 @@ async fn forgetting_the_price_returns_to_the_start_state_and_publishes_it() {
     running.live_at(6_400_000).await;
 
     assert_eq!(
-        running.game.snapshot().latest,
+        running.game.snapshot(None).await.unwrap().latest,
         latest(Some(6_400_000), false)
     );
     assert_eq!(

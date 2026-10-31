@@ -10,3 +10,19 @@ export function formatPrice(cents: number | null): string {
 export function formatScore(score: number): string {
   return `Score ${score < 0 ? `−${String(-score)}` : String(score)}`;
 }
+
+/** The difference of the latest price from the Start price, such as `+$12.40 ↑`, or `$0.00` with no arrow. */
+export function formatDifference(cents: number): string {
+  if (cents === 0) {
+    return dollars.format(0);
+  }
+
+  const amount = dollars.format(Math.abs(cents) / 100);
+
+  return cents > 0 ? `+${amount} ↑` : `−${amount} ↓`;
+}
+
+/** The time left on an Open guess in whole seconds, rounded up, so the last second shows 1 until it is over. */
+export function formatSeconds(milliseconds: number): string {
+  return String(Math.ceil(milliseconds / 1000));
+}

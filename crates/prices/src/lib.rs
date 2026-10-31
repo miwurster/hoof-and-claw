@@ -2,8 +2,10 @@
 
 mod latest;
 mod price;
+mod received;
 pub mod source;
 
 pub use latest::LatestPrice;
 pub use price::Price;
+pub use received::{ReceivedPrice, Source};
 pub use source::{PriceSource, Report};

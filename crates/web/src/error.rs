@@ -12,8 +12,12 @@ use ts_rs::TS;
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub enum ErrorCode {
+    OpenGuessExists,
+    PriceDelayed,
+    InvalidDirection,
     BadRequest,
     NotFound,
+    RateLimited,
     Internal,
 }
 
@@ -27,8 +31,11 @@ pub struct ErrorBody {
 impl ErrorCode {
     fn status(self) -> StatusCode {
         match self {
+            Self::OpenGuessExists | Self::PriceDelayed => StatusCode::CONFLICT,
+            Self::InvalidDirection => StatusCode::UNPROCESSABLE_ENTITY,
             Self::BadRequest => StatusCode::BAD_REQUEST,
             Self::NotFound => StatusCode::NOT_FOUND,
+            Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -62,6 +69,7 @@ pub(crate) async fn as_json(request: Request, next: Next) -> Response {
         | StatusCode::PAYLOAD_TOO_LARGE => ErrorCode::BadRequest,
         // A known path asked with a method it does not answer is no route either.
         StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED => ErrorCode::NotFound,
+        StatusCode::TOO_MANY_REQUESTS => ErrorCode::RateLimited,
         _ => ErrorCode::Internal,
     };
     let mut json = code.into_response();

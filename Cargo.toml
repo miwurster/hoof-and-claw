@@ -27,10 +27,15 @@ tower-http = { version = "0.7.1", features = ["fs"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 ts-rs = "12.0.1"
+uuid = { version = "1.29.0", default-features = false, features = ["std"] }
+sha2 = "0.10.9"
+governor = "0.10.4"
+tower_governor = { version = "0.8.0", default-features = false, features = ["axum"] }
 cargo_metadata = "0.23.1"
 
 bitstamp = { path = "crates/bitstamp" }
 game = { path = "crates/game" }
+guessing = { path = "crates/guessing" }
 identity = { path = "crates/identity" }
 prices = { path = "crates/prices" }
 sqlite = { path = "crates/sqlite" }

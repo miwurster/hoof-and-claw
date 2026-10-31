@@ -6,7 +6,18 @@ export type Connection = {
   readonly baseURL: string;
   readonly browser: Browser;
   readonly request: APIRequest;
+  /** The address the driver's requests come from, as the proxy in front of the server reports it. */
+  readonly network: string;
 };
+
+/** A side a Guess takes. */
+export type Direction = "Up" | "Down";
+
+/** Why the server refuses a Guess, or a visitor. */
+export type Refusal = "openGuessExists" | "priceDelayed" | "invalidDirection" | "badRequest" | "rateLimited";
+
+/** Whether the Open guess would be Correct if it resolved at the latest price, or neither while the price is unchanged. */
+export type Standing = "Correct" | "Wrong" | "Unchanged";
 
 /**
  * One Player's channel to the game: the page in a browser, or the HTTP API and its stream.
@@ -28,6 +39,31 @@ export type PlayerDriver = {
   readonly expectsAnIdentity: () => Promise<void>;
   readonly expectsAnnouncement: (announcement: "Price delayed" | "Price live") => Promise<void>;
   readonly expectsWhereTheScoreLives: () => Promise<void>;
+  readonly guesses: (direction: Direction) => Promise<void>;
+  /** Presses a Direction while the server's answer is held back, until `receivesTheAnswer`. */
+  readonly startsToGuess: (direction: Direction) => Promise<void>;
+  readonly receivesTheAnswer: () => Promise<void>;
+  /** Places a Guess whose request also carries a price and a time of the Player's choosing. */
+  readonly guessesWithAPriceAndTimeOfTheirOwn: (direction: Direction) => Promise<void>;
+  readonly guessesADirectionThatIsNeitherUpNorDown: () => Promise<void>;
+  readonly guessesWithABodyThatIsNotJson: () => Promise<void>;
+  readonly guessesWithoutSayingTheBodyIsJson: () => Promise<void>;
+  readonly movesTheFocusTo: (direction: Direction) => Promise<void>;
+  readonly pressesEnter: () => Promise<void>;
+  /** Loads the page alone, without the game's stream. */
+  readonly opensThePage: () => Promise<void>;
+  readonly expectsOpenGuess: (direction: Direction, startPrice: string) => Promise<void>;
+  /** The whole seconds left on the Open guess, at most this many and less only by the time the check takes. */
+  readonly expectsSecondsLeft: (seconds: number) => Promise<void>;
+  readonly expectsDifference: (difference: string, standing: Standing) => Promise<void>;
+  readonly expectsWaitingForThePriceToMove: () => Promise<void>;
+  readonly expectsNoSecondGuess: () => Promise<void>;
+  readonly expectsRefusal: (refusal: Refusal) => Promise<void>;
+  readonly expectsEverythingByRoleAndName: () => Promise<void>;
+  readonly expectsHornFocusRing: (direction: Direction) => Promise<void>;
+  readonly expectsNoIdentity: () => Promise<void>;
+  /** The game's API turns the visitor away, without an identity. */
+  readonly expectsTurnedAway: (refusal: Refusal) => Promise<void>;
   readonly close: () => Promise<void>;
 };
 
