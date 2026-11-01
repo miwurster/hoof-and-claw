@@ -1,5 +1,6 @@
 // Oxlint for every TypeScript package (ADR 0012): any warning fails the Green gate.
 // anti-slop is vendored in tools/oxlint/anti-slop from dmmulroy/anti-slop at 13909c9e07590f5a85d93c62712259fe14a883f7,
+// without its Effect-library rules, which nothing here needs,
 // and needs oxlint and @oxlint/plugins at exactly the same version.
 import { defineConfig } from "oxlint";
 
