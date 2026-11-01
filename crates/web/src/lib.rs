@@ -65,31 +65,31 @@ pub struct Limits {
     pub streams_per_ip: usize,
 }
 
-/// Places a Guess at most `guesses_per_minute` times a minute per IP, after a burst of `guess_burst`; `None` only for a
-/// zero limit, which `Limits` cannot hold.
+/// Places a Guess at most `guesses_per_minute` times a minute per IP, after a burst of `guess_burst`.
+#[expect(
+    clippy::expect_used,
+    reason = "the builder refuses only a zero period or burst, which the non-zero limits cannot hold"
+)]
 fn guess_limit(
     client_ip: ClientIp,
     limits: Limits,
-) -> Option<
-    GovernorLayer<
-        ClientIp,
-        governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
-        axum::body::Body,
-    >,
+) -> GovernorLayer<
+    ClientIp,
+    governor::middleware::NoOpMiddleware<governor::clock::QuantaInstant>,
+    axum::body::Body,
 > {
     let config = GovernorConfigBuilder::default()
         .key_extractor(client_ip)
         .period(Duration::from_secs(60) / limits.guesses_per_minute.get())
         .burst_size(limits.guess_burst.get())
-        .finish()?;
-    Some(
-        GovernorLayer::new(config).error_handler(|error| match error {
-            GovernorError::TooManyRequests { .. } => ErrorCode::RateLimited.into_response(),
-            GovernorError::UnableToExtractKey | GovernorError::Other { .. } => {
-                ErrorCode::Internal.into_response()
-            }
-        }),
-    )
+        .finish()
+        .expect("a non-zero rate and burst make a valid limit");
+    GovernorLayer::new(config).error_handler(|error| match error {
+        GovernorError::TooManyRequests { .. } => ErrorCode::RateLimited.into_response(),
+        GovernorError::UnableToExtractKey | GovernorError::Other { .. } => {
+            ErrorCode::Internal.into_response()
+        }
+    })
 }
 
 /// Builds the router of the whole HTTP interface.
@@ -100,11 +100,8 @@ pub fn router<C: Clock, F: Fanout, S: Store>(config: Config<C, F, S>) -> Router 
         config.limits.cookies_per_hour,
         config.limits.cookie_burst,
     );
-    let place = post(guess::place::<C, F, S>);
-    let place = match guess_limit(config.client_ip.clone(), config.limits) {
-        Some(limit) => place.layer(limit),
-        None => place,
-    };
+    let place =
+        post(guess::place::<C, F, S>).layer(guess_limit(config.client_ip.clone(), config.limits));
     let api = Router::new()
         .route("/snapshot", get(stream::snapshot::<C, F, S>))
         .route("/events", get(stream::events::<C, F, S>))
