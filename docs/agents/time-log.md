@@ -16,14 +16,20 @@ Claude Code deletes transcripts after 30 days by default, so a day older than th
 An AFK session is one where the human invoked the `kipu-herd` skill: a `user` line's text content, not a tool result, holds a `<command-name>` that ends in `kipu-herd`, such as `/wuddi:kipu-herd`.
 Every other session is attended.
 
+## Time-log sessions
+
+A time-log session is one whose first human prompt asks to log or measure the time spent on this repo, such as "log time" or a prompt that references this file.
+It counts in neither measure and not in `Sessions`, because that time goes into the log, not into the repo.
+
 ## Method
 
-1. For `Active`, collect the `timestamp` of every line in an attended session's file whose `type` is `user` or `assistant` and whose `isSidechain` is not `true`; subagent lines are out.
-2. For `AFK`, collect the same timestamps from each AFK session's file, plus the `timestamp` of every `user` or `assistant` line in its subagent transcripts.
-3. Pool the timestamps of each measure across its sessions and sort them, so overlapping sessions count once within a measure.
-4. Sum each gap between consecutive timestamps of 15 minutes or less; a longer gap is a pause and counts zero.
-5. Assign time to days in `Europe/Berlin` time, splitting a gap that crosses midnight.
-6. Count a day's sessions as the attended sessions' files with at least one timestamp on that day.
+1. Leave out every time-log session.
+2. For `Active`, collect the `timestamp` of every line in an attended session's file whose `type` is `user` or `assistant` and whose `isSidechain` is not `true`; subagent lines are out.
+3. For `AFK`, collect the same timestamps from each AFK session's file, plus the `timestamp` of every `user` or `assistant` line in its subagent transcripts.
+4. Pool the timestamps of each measure across its sessions and sort them, so overlapping sessions count once within a measure.
+5. Sum each gap between consecutive timestamps of 15 minutes or less; a longer gap is a pause and counts zero.
+6. Assign time to days in `Europe/Berlin` time, splitting a gap that crosses midnight.
+7. Count a day's sessions as the attended sessions' files with at least one timestamp on that day.
 
 Compute it with a one-off command and leave no script in the repo.
 
