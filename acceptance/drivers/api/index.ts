@@ -1,10 +1,11 @@
 // The API driver: the game's HTTP API and its stream, as the SPA uses them.
 import { expect } from "@playwright/test";
-import type { APIRequest, APIRequestContext, APIResponse, Browser } from "@playwright/test";
+import type { APIRequestContext, APIResponse } from "@playwright/test";
 import type { ErrorBody, ErrorCode, OpenGuess, PlaceGuess } from "contract";
 
 import { apply, cents, decode, forgedGuess, FORWARDED_FOR, outcome, shownResult, wire } from "./stream";
 import type { View } from "./stream";
+import type { Connection } from "./connection";
 import { expectIdentityCookie, issued, setCookies } from "./identity";
 import { Streams } from "./streams";
 import { WithoutAPage } from "./without-a-page";
@@ -14,13 +15,6 @@ export { measuredApiPlayer } from "./measured";
 export { apiServer } from "./server";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
-
-type Connection = {
-  readonly baseURL: string;
-  readonly browser: Browser;
-  readonly request: APIRequest;
-  readonly network: string;
-};
 
 /** A Player's HTTP client with its own identity cookie and streams, from its own network. */
 class ApiPlayer extends WithoutAPage {

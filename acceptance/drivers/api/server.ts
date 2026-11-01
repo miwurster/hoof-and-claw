@@ -1,19 +1,13 @@
 // The API driver's view of the server itself, outside any Player.
 import { expect } from "@playwright/test";
-import type { APIRequest, APIResponse, Browser } from "@playwright/test";
+import type { APIResponse } from "@playwright/test";
 import type { ErrorBody, Health, ServerEvent } from "contract";
 
+import type { Connection } from "./connection";
 import { decode, FORWARDED_FOR } from "./stream";
 
 const MISSING_GAME_ROUTE = "/api/a-route-that-does-not-exist";
 const MISSING_TEST_CONTROL = "/test-controls/a-control-that-does-not-exist";
-
-type Connection = {
-  readonly baseURL: string;
-  readonly browser: Browser;
-  readonly request: APIRequest;
-  readonly network: string;
-};
 
 async function missing(response: APIResponse) {
   const body = await decode<ErrorBody>(response);

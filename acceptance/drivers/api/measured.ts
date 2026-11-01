@@ -1,20 +1,13 @@
 // The API driver for a Player under load: one stream and timed steps, timestamped as each event arrives (ADR 0015).
-import type { APIRequest, Browser } from "@playwright/test";
 import type { ErrorBody, PlaceGuess, ServerEvent } from "contract";
 
+import type { Connection } from "./connection";
 import { cents, decode, FORWARDED_FOR, read, wire } from "./stream";
 
 const IDENTITY = "__Host-player";
 
 /** How long a step waits for an event before it counts as an error. */
 const EVENT_TIMEOUT_MS = 10_000;
-
-type Connection = {
-  readonly baseURL: string;
-  readonly browser: Browser;
-  readonly request: APIRequest;
-  readonly network: string;
-};
 
 /** A Player with one stream, who notes when each event arrived on the harness's clock. */
 class MeasuredApiPlayer {
