@@ -3,3 +3,5 @@ export type * from "./AdvanceClock";
 export type * from "./SendPrice";
 export type * from "./SetClock";
 export type * from "./SetConnection";
+export type * from "./SetStore";
+export type * from "./StoreFailure";

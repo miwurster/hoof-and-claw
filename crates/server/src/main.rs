@@ -31,10 +31,11 @@ async fn main() -> anyhow::Result<()> {
     let result = {
         let clock = test_controls::ControllableClock::new();
         let (source, controls) = test_controls::controllable_source();
+        let (store, store_controls) = test_controls::controllable_store(database.clone());
         let game = Game::new(
             clock.clone(),
             Broadcast::new(configuration.player_event_queue),
-            database.clone(),
+            store,
         );
         let close_source = {
             let controls = controls.clone();
@@ -43,6 +44,7 @@ async fn main() -> anyhow::Result<()> {
         let test_controls = test_controls::routes(test_controls::Controls {
             clock,
             source: controls,
+            store: store_controls,
             game: game.clone(),
         });
         serve(

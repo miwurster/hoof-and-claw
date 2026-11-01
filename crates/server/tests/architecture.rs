@@ -34,7 +34,10 @@ fn may_depend_on(krate: &str) -> Option<(&'static [&'static str], &'static [&'st
             &["game", "prices", "guessing", "identity"],
             &["axum", "tower-http", "serde", "ts-rs"],
         ),
-        "test-controls" => (&["game", "prices"], &["axum", "serde", "ts-rs"]),
+        "test-controls" => (
+            &["game", "prices", "guessing", "identity"],
+            &["axum", "serde", "ts-rs"],
+        ),
         "server" => (
             &[
                 "prices",

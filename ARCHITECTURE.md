@@ -31,7 +31,7 @@ A pure crate does no I/O, starts no async runtime and reads no clock.
 | `sqlite`        | adapter      | every core's store port on one database file and one write connection                                                      | the cores, `sqlx`                                         |
 | `web`           | adapter      | axum routes, the SSE stream, the identity cookie, static files, the wire types of the API contract                         | `game`, the cores, `axum`, `tower-http`, `serde`, `ts-rs` |
 | `server`        | binary       | configuration, wiring, start-up, shutdown                                                                                  | every crate above                                         |
-| `test-controls` | test adapter | the controllable `Clock` and `PriceSource`, the HTTP endpoints that drive them, and their wire types                       | `game`, `prices`, `axum`, `serde`, `ts-rs`                |
+| `test-controls` | test adapter | the controllable `Clock`, `PriceSource` and store, the HTTP endpoints that drive them, and their wire types | `game`, the cores, `axum`, `serde`, `ts-rs` |
 
 The "May depend on" column is enforced by `crate_graph_follows_the_table` in `crates/server/tests/architecture.rs`, which reads `cargo metadata`.
 Only the crates in the table may depend directly on `tokio`, `sqlx`, `axum`, `tower-http` and `tokio-tungstenite`; enforced by cargo-deny `wrappers` in `deny.toml`.
@@ -47,7 +47,7 @@ No module is called `models`, `services`, `repositories`, `utils` or `helpers`; 
 | ----------------------- | ---------------------- | ------------------------------------------------ | ------------------------------------------ |
 | `PriceSource`           | `prices`               | `bitstamp`                                       | the controllable source in `test-controls` |
 | `Clock`                 | `game`                 | the system clock in `server`                     | the controllable clock in `test-controls`  |
-| one store port per core | `guessing`, `identity` | `sqlite`                                         | a hand-written in-memory fake in the core  |
+| one store port per core | `guessing`, `identity` | `sqlite` | a hand-written in-memory fake in the core, and the controllable store in `test-controls` around the real one |
 | `Fanout`                | `game`                 | the in-process broadcast in `game`               | a recording fake in `game`                 |
 
 - A port is a plain trait named after the capability in glossary terms: `PriceSource`, never `PriceSourcePort`, `IPriceSource`, `PriceSourceImpl`, or a `Service`, `Manager` or `Repository` suffix.
@@ -104,7 +104,7 @@ A Playwright Test package in Dave Farley's four layers, one folder each:
 | `cases/`            | test cases in glossary terms                                                                             | `dsl/`                                             |
 | `performance/`      | performance cases with their budgets (ADR 0015)                                                          | `dsl/`                                             |
 | `smoke/`            | the checks against the deployed service, without control channels (ADR 0013)                             | `dsl/`                                             |
-| `dsl/`              | actors (`alice`, `priceSource`, `clock`, `server`, the group `players(n)`) and their `should` assertions | the driver interface                               |
+| `dsl/` | actors (`alice`, `priceSource`, `clock`, `store`, `server`, the group `players(n)`) and their `should` assertions | the driver interface                               |
 | `drivers/ui/`       | the driver for the SPA in a browser                                                                      | Playwright                                         |
 | `drivers/api/`      | the driver for the HTTP API and the SSE stream                                                           | Playwright's request API, `contract/`              |
 | `drivers/controls/` | calls to the `test-controls` endpoints                                                                   | Playwright's request API, `contract/test-controls` |

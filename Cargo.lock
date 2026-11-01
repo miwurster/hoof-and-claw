@@ -2125,6 +2125,8 @@ dependencies = [
  "futures-executor",
  "futures-util",
  "game",
+ "guessing",
+ "identity",
  "jiff",
  "prices",
  "serde",

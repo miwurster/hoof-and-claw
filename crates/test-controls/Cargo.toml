@@ -10,6 +10,8 @@ axum.workspace = true
 futures-channel.workspace = true
 futures-util.workspace = true
 game = { workspace = true, features = ["test-controls"] }
+guessing.workspace = true
+identity.workspace = true
 jiff.workspace = true
 prices.workspace = true
 serde.workspace = true

@@ -38,3 +38,21 @@ pub struct SetClock {
     #[ts(type = "string")]
     pub time: Timestamp,
 }
+
+/// Makes the store fail, as one state that replaces the one before.
+#[derive(Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[ts(export, export_to = "test-controls/")]
+pub struct SetStore {
+    pub fails: StoreFailure,
+}
+
+/// What the store fails: nothing, every save of resolutions, or every operation.
+#[derive(Clone, Copy, Debug, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "test-controls/")]
+pub enum StoreFailure {
+    Nothing,
+    Resolutions,
+    Everything,
+}

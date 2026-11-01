@@ -52,11 +52,12 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 Side effects: none beyond the public interface.
 Score, Outcome and the Open guess are read through the HTTP API and the SSE stream, never from the SQLite file.
 
-Time and price: only the four `test-controls` commands, at the routes `crates/test-controls` defines.
+Time, price and the store: only the five `test-controls` commands, at the routes `crates/test-controls` defines.
 
 1. Send a price.
 2. Lose the connection to the Price source, or restore it.
 3. Advance the clock.
 4. Set the clock to a time.
+5. Make the store fail: nothing, every save of resolutions, or every read and write.
 
 The clock stands still until a command moves it, and a guess resolves only on a received price.

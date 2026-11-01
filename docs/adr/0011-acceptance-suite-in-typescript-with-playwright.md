@@ -45,6 +45,7 @@ await alice.should.haveScore(1);
 - **Prices** are written as dollar strings, and the drivers convert them to cents (ADR 0009).
 - **Coming back.** `alice.closesTheBrowserAndReturns()` keeps the cookie and reopens the page, or the SSE stream in the API driver.
 - **Restarting.** `server.restarts()` stops the worker's process, starts it again on the same SQLite file, and sets the clock back to the time the suite last set.
+  It makes the store fail nothing before it stops the process, because the game waits for a running save of resolutions on shutdown, and that save never ends while saves fail.
   It proves that an Open guess survives a deploy (ADR 0003).
 
 ### Two drivers for every case
@@ -60,9 +61,9 @@ An example is "Up and Down are disabled while the price is delayed", which only 
 - **Waiting.** Both drivers wait for an expected state with a timeout (`expect`, `expect.poll`).
   No test sleeps, and a lint rule forbids `waitForTimeout` (ADR 0012).
 
-### Time and price
+### Time, price and the store
 
-`test-controls` offers four commands over HTTP:
+`test-controls` offers five commands over HTTP:
 
 1. **Send a price.** The controllable `PriceSource` delivers it as a received price.
 2. **Lose the connection, or restore it.** This switches between Price delayed and live.
@@ -70,6 +71,12 @@ An example is "Up and Down are disabled while the price is delayed", which only 
    So a test that wants to play first sends a price, which the DSL does in one step.
 3. **Advance the clock.**
 4. **Set the clock to a time.** `server.restarts()` needs it.
+5. **Make the store fail.** The controllable store wraps the real one and fails `nothing`, `resolutions` (every save of resolutions) or `everything` (every read and write of both store ports), as an unavailable store would.
+   The DSL's `store.failsResolutions()`, `store.goesDown()` and `store.recovers()` drive it.
+
+The store's command sets a state, not a count of failures.
+The game tries a failed save of resolutions again after a growing wait on `tokio`'s real time, not on the `Clock`.
+A count of `n` failures would race the test's steps against those retries, and a case could pass with a bug back in; a state holds until the test changes it, so the case decides when the store recovers.
 
 The controllable `Clock` stands still until a test moves it.
 Resolution happens on a received price (ADR 0010), so a test places a guess, advances the clock, sends a price and checks the Outcome, with no race.
@@ -85,7 +92,7 @@ A second price within the same second therefore reaches the test after at most o
   A worker fixture starts one process per worker on port 0 with its own temporary SQLite file and waits for it to be ready.
 - **Parallel.** Playwright runs one worker per CPU core by default, and the tests inside a worker run one after another.
   So a test has its server's clock and price to itself.
-- **Fresh state per test.** Before each test, the fixture resets the `PriceSource` to its start state: Price delayed and no price.
+- **Fresh state per test.** Before each test, the fixture resets the `PriceSource` to its start state, Price delayed and no price, and makes the store fail nothing.
   The clock only moves forward and is not reset.
   Each test uses fresh Players through a new browser context or cookie, so Open guesses left by earlier tests belong to other Players and do no harm.
 
