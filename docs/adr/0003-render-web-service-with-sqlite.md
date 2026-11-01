@@ -56,7 +56,7 @@ One always-on process is the simplest design that meets every rule of the brief,
   For a three-month demo we accept that risk.
   The scale path adds continuous replication to object storage, for example with Litestream.
 - Render builds the Dockerfile from a `release` branch and deploys it; a Release fast-forwards `release` to a `main` commit whose Green gate passed, and every Release spends Render build minutes (ADR 0013).
-- Terraform with the `render-oss/render` provider, applied by hand, describes the service, its `release` branch, disk, domain, health check and environment, and keeps its state in HCP Terraform Free.
+- Terraform with the `render-oss/render` provider, applied by hand, describes the service, its `release` branch, disk, domain, health check and environment, and keeps its state only on the machine that applies it, outside Git.
   All-Inkl has no Terraform provider, so the `CNAME` from `hoof-and-claw` to the service's `onrender.com` host is a one-time manual step.
 - Render shares outbound IP addresses per region.
   A probe on 2026-10-31 confirmed that Bitstamp's feed and REST ticker accept connections from Render Frankfurt ("Check the price feeds from Render Frankfurt").

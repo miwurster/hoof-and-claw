@@ -1,17 +1,10 @@
 # The Render service of Hoof & Claw (ADR 0003, ADR 0013), applied by hand.
-# State lives in HCP Terraform Free. The provider reads RENDER_API_KEY and RENDER_OWNER_ID from the environment.
+# State lives only on the machine that applies it, outside Git; infra/README.md says how to apply and how to recover it.
+# The provider reads RENDER_API_KEY and RENDER_OWNER_ID from the environment.
 # The CNAME of the custom domain at All-Inkl is set by hand.
 
 terraform {
   required_version = "~> 1.16"
-
-  cloud {
-    organization = "miwurster"
-
-    workspaces {
-      name = "hoof-and-claw"
-    }
-  }
 
   required_providers {
     render = {

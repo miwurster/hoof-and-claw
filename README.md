@@ -323,7 +323,7 @@ All tasks run through [mise](https://mise.jdx.dev/), which also pins the tool ve
 CI (GitHub Actions) runs only the Green gate, on every push to `main` and every pull request.
 A Release fast-forwards the `release` branch to a `main` commit whose gate passed; Render builds the Docker image from that branch and deploys it.
 Rollback uses Render's dashboard.
-Terraform describes the Render service.
+Terraform describes the Render service; `infra/README.md` says how to apply it.
 
 ## Going deeper
 

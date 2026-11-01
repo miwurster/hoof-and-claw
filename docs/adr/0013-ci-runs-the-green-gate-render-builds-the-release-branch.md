@@ -55,5 +55,5 @@ Both run by hand from the acceptance package, outside the Green gate and without
 - Render builds the image that runs, not the pipeline.
   The Green gate tests the local build, not the image, so a broken Dockerfile shows up only on a Release.
 - Every Release spends Render build minutes; a Hobby workspace includes 500 Starter-tier minutes a month.
-- You apply Terraform changes by hand against HCP Terraform Free, so the pipeline holds no Render or HCP credentials.
+- You apply Terraform changes by hand, with the state on your machine, so the pipeline holds no Render credentials.
 - What is live is whatever `release` points to, so `git log release` is the deploy history.
