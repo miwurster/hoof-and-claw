@@ -1,4 +1,4 @@
-// What a check against the deployed service imports: Alice and the server, with no control channels (ADR 0011, ADR 0013).
+// What a check against the deployed service imports: Alice, Bob and the server, with no control channels (ADR 0011, ADR 0013).
 import { execFileSync } from "node:child_process";
 
 import { test as base } from "@playwright/test";
@@ -29,6 +29,8 @@ function releasedCommit(): string {
 
 type Actors = {
   readonly alice: Player;
+  /** A second Player on this machine, whose requests claim another network in `X-Forwarded-For`. */
+  readonly bob: Player;
   readonly server: Server;
 };
 
@@ -57,6 +59,18 @@ export const test = base.extend<Actors & Options>({
     });
 
     await use(new Player("Alice", driver));
+    await driver.close();
+  },
+
+  bob: async ({ drivers, browser, playwright }, use) => {
+    const driver = await drivers.player({
+      baseURL: deployedURL,
+      browser,
+      request: playwright.request,
+      network: freshNetwork(),
+    });
+
+    await use(new Player("Bob", driver));
     await driver.close();
   },
 

@@ -26,3 +26,16 @@ test(
     await server.should.reportTheReleasedBuild();
   },
 );
+
+test(
+  "A forged X-Forwarded-For does not lift the deployed limit of 10 streams per IP",
+  // API only: a page holds one stream, so only the API can open eleven from one IP.
+  // Alice and Bob run on this machine, so they share its IP; each claims a network of their own in X-Forwarded-For.
+  // Run it apart from `pnpm smoke:hold`, whose stream takes one of the 10 places.
+  { tag: "@api" },
+  async ({ alice, bob }) => {
+    await alice.opensTheGameInTabs(10);
+
+    await bob.should.beRefusedTheGame("rateLimited");
+  },
+);

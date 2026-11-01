@@ -14,6 +14,9 @@ export default defineConfig<{ readonly drivers: Drivers }>({
   testDir: "smoke",
   forbidOnly: true,
   retries: 0,
+  // One worker: every check comes from this machine's IP, and a stream another check held at the same time would take
+  // one of the 10 places the per-IP limit check fills.
+  workers: 1,
   reporter: "list",
   use: {
     ...devices["Desktop Chrome"],
