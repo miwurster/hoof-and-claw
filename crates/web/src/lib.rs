@@ -65,18 +65,6 @@ pub struct Limits {
     pub streams_per_ip: usize,
 }
 
-impl Default for Limits {
-    fn default() -> Self {
-        Self {
-            guesses_per_minute: NonZeroU32::new(10).unwrap_or(NonZeroU32::MIN),
-            guess_burst: NonZeroU32::new(10).unwrap_or(NonZeroU32::MIN),
-            cookies_per_hour: NonZeroU32::new(30).unwrap_or(NonZeroU32::MIN),
-            cookie_burst: NonZeroU32::new(30).unwrap_or(NonZeroU32::MIN),
-            streams_per_ip: 10,
-        }
-    }
-}
-
 /// Places a Guess at most `guesses_per_minute` times a minute per IP, after a burst of `guess_burst`; `None` only for a
 /// zero limit, which `Limits` cannot hold.
 fn guess_limit(
