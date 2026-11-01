@@ -294,6 +294,15 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         }
         let fresh = PlayerId::new(self.clock.now(), random()?);
         let waiting = *self.waiting_visitors().entry(token.hash()).or_insert(fresh);
+        // A first Guess may have linked the token since it was read, and taken its waiting Player ID out already.
+        if let Some(player) = self.player(token).await? {
+            let mut visitors = self.waiting_visitors();
+            if visitors.get(&token.hash()) == Some(&waiting) {
+                visitors.remove(&token.hash());
+            }
+            drop(visitors);
+            return Ok((Some(player), self.fanout.subscribe(Some(player))));
+        }
         Ok((None, self.fanout.subscribe(Some(waiting))))
     }
 
