@@ -5,6 +5,11 @@ This log is a rough estimate of the time per day, in Berlin time, that went into
 Pauses over 15 minutes count zero, and parallel sessions count once.
 The agent updates this file on request as described in `docs/agents/time-log.md`.
 
+Most of this time went into the groundwork a production service needs before its first feature: 15 ADRs, the architecture and coding standards, a Green gate with acceptance tests and performance budgets, CI, infrastructure, and a verification loop in which agents prove their own changes.
+About half of the commits are `docs` commits.
+Later features reuse this groundwork instead of building it again.
+`Active` also counts time in which the agent worked while the human watched or reviewed.
+
 | Date       | Active         | AFK            | Sessions |
 | ---------- | -------------- | -------------- | -------- |
 | 2026-10-30 | 0 h 15 min     | 0 h 00 min     | 3        |
