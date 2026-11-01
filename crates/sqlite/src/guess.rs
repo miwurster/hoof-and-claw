@@ -91,6 +91,40 @@ fn guess_id(text: &str) -> Result<GuessId, StoreError> {
         .map_err(|_| corrupt(format!("the guess ID {text:?}")))
 }
 
+/// The columns of a Guess as it was placed.
+struct GuessRow {
+    id: String,
+    player_id: String,
+    direction: String,
+    placed_at: i64,
+    start_price_cents: i64,
+    start_received_at: i64,
+    start_source: String,
+    start_trade_id: Option<i64>,
+}
+
+impl TryFrom<GuessRow> for OpenGuess {
+    type Error = StoreError;
+
+    fn try_from(row: GuessRow) -> Result<Self, StoreError> {
+        Ok(Self {
+            id: guess_id(&row.id)?,
+            player: row
+                .player_id
+                .parse::<PlayerId>()
+                .map_err(|_| corrupt(format!("the Player ID {:?}", row.player_id)))?,
+            direction: direction(&row.direction)?,
+            start: received(
+                row.start_price_cents,
+                &row.start_source,
+                row.start_trade_id,
+                row.start_received_at,
+            )?,
+            placed_at: timestamp(row.placed_at)?,
+        })
+    }
+}
+
 fn received(
     cents: i64,
     source_name: &str,
@@ -215,7 +249,8 @@ impl Store for Database {
     }
 
     async fn open_guesses(&self) -> Result<Vec<OpenGuess>, StoreError> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query_as!(
+            GuessRow,
             "SELECT id, player_id, direction, placed_at, start_price_cents, start_received_at, start_source,
                  start_trade_id
              FROM guesses WHERE state = 'open'",
@@ -223,25 +258,7 @@ impl Store for Database {
         .fetch_all(&self.pool)
         .await
         .map_err(unavailable)?;
-        rows.into_iter()
-            .map(|row| {
-                Ok(OpenGuess {
-                    id: guess_id(&row.id)?,
-                    player: row
-                        .player_id
-                        .parse::<PlayerId>()
-                        .map_err(|_| corrupt(format!("the Player ID {:?}", row.player_id)))?,
-                    direction: direction(&row.direction)?,
-                    start: received(
-                        row.start_price_cents,
-                        &row.start_source,
-                        row.start_trade_id,
-                        row.start_received_at,
-                    )?,
-                    placed_at: timestamp(row.placed_at)?,
-                })
-            })
-            .collect()
+        rows.into_iter().map(OpenGuess::try_from).collect()
     }
 
     async fn standing(&self, player: PlayerId) -> Result<Standing, StoreError> {
@@ -252,32 +269,19 @@ impl Store for Database {
             .await
             .map_err(unavailable)?
             .unwrap_or(0);
-        let open = sqlx::query!(
-            "SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id
+        let open = sqlx::query_as!(
+            GuessRow,
+            "SELECT id, player_id, direction, placed_at, start_price_cents, start_received_at, start_source,
+                 start_trade_id
              FROM guesses WHERE player_id = ? AND state = 'open'",
             id,
         )
         .fetch_optional(&mut *connection)
         .await
         .map_err(unavailable)?;
-        let open_guess = open
-            .map(|row| {
-                Ok::<_, StoreError>(OpenGuess {
-                    id: guess_id(&row.id)?,
-                    player,
-                    direction: direction(&row.direction)?,
-                    start: received(
-                        row.start_price_cents,
-                        &row.start_source,
-                        row.start_trade_id,
-                        row.start_received_at,
-                    )?,
-                    placed_at: timestamp(row.placed_at)?,
-                })
-            })
-            .transpose()?;
+        let open_guess = open.map(OpenGuess::try_from).transpose()?;
         let last = sqlx::query!(
-            r#"SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id,
+            r#"SELECT id, player_id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id,
                  end_price_cents AS "end_price_cents!", end_received_at AS "end_received_at!",
                  end_source AS "end_source!", end_trade_id, outcome AS "outcome!"
              FROM guesses WHERE player_id = ? AND state = 'resolved'
@@ -290,18 +294,16 @@ impl Store for Database {
         let last_resolved = last
             .map(|row| {
                 Ok::<_, StoreError>(ResolvedGuess {
-                    guess: OpenGuess {
-                        id: guess_id(&row.id)?,
-                        player,
-                        direction: direction(&row.direction)?,
-                        start: received(
-                            row.start_price_cents,
-                            &row.start_source,
-                            row.start_trade_id,
-                            row.start_received_at,
-                        )?,
-                        placed_at: timestamp(row.placed_at)?,
-                    },
+                    guess: OpenGuess::try_from(GuessRow {
+                        id: row.id,
+                        player_id: row.player_id,
+                        direction: row.direction,
+                        placed_at: row.placed_at,
+                        start_price_cents: row.start_price_cents,
+                        start_received_at: row.start_received_at,
+                        start_source: row.start_source,
+                        start_trade_id: row.start_trade_id,
+                    })?,
                     end: received(
                         row.end_price_cents,
                         &row.end_source,
