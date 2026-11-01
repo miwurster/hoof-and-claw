@@ -22,8 +22,9 @@ A cookie works with `EventSource`, which cannot set headers, keeps the token awa
 - When the cookie is lost, so is the Player, and the browser starts over at 0.
   The UI says in one line that the Score lives in this browser.
 - Frontend and API must share one origin, which constrains the hosting choice.
-- An `Identity` port turns a request into a Player ID.
-  The domain core never sees tokens or cookies, and the anonymous-cookie adapter is the demo's only implementation.
+- The server turns a request into a Player ID: `web` reads the cookie, and `identity` hashes the token and looks it up in its store.
+  The domain core never sees tokens or cookies.
+  An `Identity` port arrives with a second way of signing in, not before (ADR 0008).
 - When accounts arrive, the Player keeps owning the Score and Guesses, and each way of signing in is attached to a Player.
   The anonymous token is one such way, and a later login, for example an OIDC subject, is another.
   On first sign-in, an account without a Player takes over the browser's anonymous Player, including its Score and any Open guess.

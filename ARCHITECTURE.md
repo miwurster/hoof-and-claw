@@ -48,7 +48,6 @@ No module is called `models`, `services`, `repositories`, `utils` or `helpers`; 
 | `PriceSource`           | `prices`               | `bitstamp`                                       | the controllable source in `test-controls` |
 | `Clock`                 | `game`                 | the system clock in `server`                     | the controllable clock in `test-controls`  |
 | one store port per core | `guessing`, `identity` | `sqlite`                                         | a hand-written in-memory fake in the core  |
-| `Identity`              | `identity`             | the anonymous token, its cookie handled in `web` | a hand-written in-memory fake              |
 | `Fanout`                | `game`                 | the in-process broadcast in `game`               | a recording fake in `game`                 |
 
 - A port is a plain trait named after the capability in glossary terms: `PriceSource`, never `PriceSourcePort`, `IPriceSource`, `PriceSourceImpl`, or a `Service`, `Manager` or `Repository` suffix.

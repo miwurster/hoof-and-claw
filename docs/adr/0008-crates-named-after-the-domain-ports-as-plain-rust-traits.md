@@ -27,7 +27,7 @@ Inside a crate, modules are named after glossary terms (`guess.rs`, `score.rs`),
 
 ## Ports
 
-There are five ports.
+There are four ports.
 Each has a real adapter and a test adapter, so something varies across every seam.
 
 - **`PriceSource` in `prices`.** It delivers a stream of received prices, each with its Price source, server receipt time and trade id, and of changes between live and Price delayed.
@@ -40,9 +40,6 @@ Each has a real adapter and a test adapter, so something varies across every sea
   Each port offers a few operations in domain language, such as placing a guess or resolving one together with its Score change in one call, never generic CRUD.
   Adapters: `sqlite` and a hand-written in-memory fake.
   Both pass one shared test suite per port (ADR 0006).
-- **Identity in `identity`.** It turns a token into a Player ID, or issues a new one.
-  The cookie handling around it stays in `web` (ADR 0001).
-
 - **`Fanout` in `game`.** It publishes prices to every open SSE stream and a Player's events to that Player's streams (ADR 0010).
   Adapters: an in-process broadcast in `game` and a recording fake for `game`'s tests.
   Both pass one shared test suite.
@@ -95,6 +92,10 @@ The release image is built without it, and a check in the gate asserts that the 
   When each core owns its port, it keeps a new area's storage next to its rules.
 - **A transaction across `identity` and `guessing` for the first Guess.** Rejected.
   It would need a port spanning both areas, and the fixed write order leaves only a state ADR 0001 already handles.
+- **An `Identity` port in `identity` that turns a token into a Player ID, or issues a new one.** Rejected for the demo.
+  The anonymous token is the only way to sign in, so the port would have one implementation, against rule 2 of "Rust, not Java in Rust".
+  Issuing and hashing a token are free functions in `identity`, the lookup goes through `identity`'s store port, which already has two adapters, and the cookie stays in `web` (ADR 0001).
+  The trait arrives with a second way of signing in, such as an OIDC login.
 - **A runtime flag for the test controls in the production binary.** Rejected.
   It is simpler, but it ships a way to set the price and the time to production.
 

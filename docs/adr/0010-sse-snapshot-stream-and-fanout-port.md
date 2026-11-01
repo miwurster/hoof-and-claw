@@ -95,7 +95,7 @@ The scale path below splits `Fanout` into a price broadcast and Player notificat
 ## Consequences
 
 - ADR 0003 and ADR 0005 now say that a reconnecting client gets its state from the snapshot.
-- ADR 0008 lists `Fanout` as its fifth port.
+- ADR 0008 lists `Fanout` as its fourth port.
 - If the server restarts while a save is being retried, the guess is still open in the store and resolves against the first changed price after the restart, as ADR 0002 already defines for guesses that fall due during a restart.
 - ADR 0014 fixes the event names and payloads.
 
