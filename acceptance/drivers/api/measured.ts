@@ -2,7 +2,8 @@
 import type { ErrorBody, PlaceGuess, ServerEvent } from "contract";
 
 import type { Connection } from "./connection";
-import { cents, decode, FORWARDED_FOR, read, wire } from "./stream";
+import { decode, FORWARDED_FOR, read } from "./stream";
+import { cents, wire } from "./wire";
 
 const IDENTITY = "__Host-player";
 
