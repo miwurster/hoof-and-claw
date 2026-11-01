@@ -2,6 +2,7 @@
 
 mod clock;
 mod configuration;
+mod listener;
 mod logging;
 
 use std::net::SocketAddr;
@@ -11,7 +12,6 @@ use anyhow::Context as _;
 use clap::Parser as _;
 use game::{Broadcast, Clock, Fanout, Game, Store};
 use prices::PriceSource;
-use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::time::Instant;
 
@@ -107,8 +107,7 @@ async fn serve<C: Clock, F: Fanout, S: Store>(
         },
         test_controls,
     });
-    let listener = TcpListener::bind(("0.0.0.0", configuration.port))
-        .await
+    let listener = listener::listen(configuration.port)
         .with_context(|| format!("binding port {}", configuration.port))?;
     tracing::info!("listening on {}", listener.local_addr()?);
 
