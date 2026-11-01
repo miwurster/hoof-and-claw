@@ -4,10 +4,11 @@ use guessing::{OpenGuess, PlayerId, Resolution, ResolvedGuess, Standing};
 use identity::TokenHash;
 
 /// What a controllable store fails, as one state that replaces the one before.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+///
+/// The variants are ordered so that a later one fails at least as much as an earlier one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Failing {
     /// Every operation goes through to the real store.
-    #[default]
     Nothing,
     /// Every save of resolutions fails as an unavailable store's would.
     Resolutions,
@@ -58,24 +59,31 @@ impl<S> ControllableStore<S> {
         *self.failing.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn fails_everything(&self) -> bool {
-        self.failing() == Failing::Everything
+    /// Fails when the store fails at least what `from` says.
+    fn refuses(&self, from: Failing) -> Result<(), Failed> {
+        if self.failing() >= from {
+            Err(Failed)
+        } else {
+            Ok(())
+        }
     }
 }
 
-fn guessing_unavailable() -> guessing::StoreError {
-    guessing::StoreError::Unavailable(Box::new(Failed))
+impl From<Failed> for guessing::StoreError {
+    fn from(failed: Failed) -> Self {
+        Self::Unavailable(Box::new(failed))
+    }
 }
 
-fn identity_unavailable() -> identity::StoreError {
-    identity::StoreError::Unavailable(Box::new(Failed))
+impl From<Failed> for identity::StoreError {
+    fn from(failed: Failed) -> Self {
+        Self::Unavailable(Box::new(failed))
+    }
 }
 
 impl<S: guessing::Store> guessing::Store for ControllableStore<S> {
     async fn place(&self, guess: &OpenGuess) -> Result<(), guessing::StoreError> {
-        if self.fails_everything() {
-            return Err(guessing_unavailable());
-        }
+        self.refuses(Failing::Everything)?;
         self.store.place(guess).await
     }
 
@@ -83,32 +91,24 @@ impl<S: guessing::Store> guessing::Store for ControllableStore<S> {
         &self,
         resolved: &[ResolvedGuess],
     ) -> Result<Vec<Resolution>, guessing::StoreError> {
-        if self.failing() != Failing::Nothing {
-            return Err(guessing_unavailable());
-        }
+        self.refuses(Failing::Resolutions)?;
         self.store.resolve(resolved).await
     }
 
     async fn open_guesses(&self) -> Result<Vec<OpenGuess>, guessing::StoreError> {
-        if self.fails_everything() {
-            return Err(guessing_unavailable());
-        }
+        self.refuses(Failing::Everything)?;
         self.store.open_guesses().await
     }
 
     async fn standing(&self, player: PlayerId) -> Result<Standing, guessing::StoreError> {
-        if self.fails_everything() {
-            return Err(guessing_unavailable());
-        }
+        self.refuses(Failing::Everything)?;
         self.store.standing(player).await
     }
 }
 
 impl<S: identity::Store> identity::Store for ControllableStore<S> {
     async fn player(&self, token: TokenHash) -> Result<Option<PlayerId>, identity::StoreError> {
-        if self.fails_everything() {
-            return Err(identity_unavailable());
-        }
+        self.refuses(Failing::Everything)?;
         self.store.player(token).await
     }
 
@@ -117,9 +117,7 @@ impl<S: identity::Store> identity::Store for ControllableStore<S> {
         token: TokenHash,
         candidate: PlayerId,
     ) -> Result<PlayerId, identity::StoreError> {
-        if self.fails_everything() {
-            return Err(identity_unavailable());
-        }
+        self.refuses(Failing::Everything)?;
         self.store.link(token, candidate).await
     }
 }
