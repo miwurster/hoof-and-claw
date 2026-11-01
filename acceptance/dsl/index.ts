@@ -9,8 +9,8 @@ import { freshNetwork, Neighbours } from "./network";
 import { Player } from "./player";
 import { Players } from "./players";
 import { PriceSource } from "./price-source";
-import { Server } from "./server";
-import { Store } from "./store";
+import { Server, storeOf } from "./server";
+import type { Store } from "./server";
 import { startServer } from "./server-process";
 import type { ServerProcess } from "./server-process";
 
@@ -154,7 +154,7 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
   },
 
   store: async ({ controls }, use) => {
-    await use(new Store(controls));
+    await use(storeOf(controls));
   },
 
   server: async ({ drivers, serverProcess, connect, controls, priceSource }, use) => {

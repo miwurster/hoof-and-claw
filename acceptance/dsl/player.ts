@@ -22,7 +22,12 @@ export class Player {
     readonly name: string,
     private readonly driver: PlayerDriver,
   ) {
-    this.should = { ...seeing(name, driver), ...resolving(driver), ...acting(name, driver) };
+    this.should = {
+      ...seeing(name, driver),
+      ...resolving(driver),
+      ...acting(driver),
+      ...connecting(name, driver),
+    };
   }
 
   async opensAnUnknownPage(): Promise<void> {
@@ -166,7 +171,7 @@ function resolving(driver: PlayerDriver) {
 }
 
 /** What a Player should be able to do, and what the game should know of them. */
-function acting(name: string, driver: PlayerDriver) {
+function acting(driver: PlayerDriver) {
   return {
     beAbleToGuess: async (): Promise<void> => {
       await driver.expectsGuessing(true);
@@ -204,6 +209,12 @@ function acting(name: string, driver: PlayerDriver) {
     beToldWhereTheScoreLives: async (): Promise<void> => {
       await driver.expectsWhereTheScoreLives();
     },
+  };
+}
+
+/** How the game answers a Player who asks for it: the stream, the snapshot, and the page reconnecting. */
+function connecting(name: string, driver: PlayerDriver) {
+  return {
     /** Is refused the game's stream, with an error code such as "internal". */
     beRefusedTheGame: async (refusal: Refusal): Promise<void> => {
       const answer = await driver.triesToOpenTheGame();

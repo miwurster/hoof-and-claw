@@ -121,3 +121,23 @@ export class Server {
     return this.restart;
   }
 }
+
+/** The store the game keeps Players, Guesses and Scores in, which the test controls can make fail. */
+export type Store = ReturnType<typeof storeOf>;
+
+/** The worker's store, made to fail through the test controls. */
+export function storeOf(driver: ControlsDriver) {
+  return {
+    /** Every save of resolutions fails, as an unavailable store's would, until the store recovers. */
+    failsResolutions: async (): Promise<void> => {
+      await driver.setsStoreFailing("resolutions");
+    },
+    /** Every read and write fails, as an unavailable store's would, until the store recovers. */
+    goesDown: async (): Promise<void> => {
+      await driver.setsStoreFailing("everything");
+    },
+    recovers: async (): Promise<void> => {
+      await driver.setsStoreFailing("nothing");
+    },
+  };
+}
