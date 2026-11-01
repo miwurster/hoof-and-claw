@@ -75,10 +75,11 @@ type ServerEvent = Snapshot | PriceChanged | GuessPlaced | GuessResolved;
 
 ### SSE framing
 
-- An event has no `event:` field and no `id:` field; its `data:` line holds the JSON object.
-  Every event reaches `EventSource`'s `message` handler, and the reducer switches on `type`.
+- A game event has no `event:` field and no `id:` field; its `data:` line holds the JSON object.
+  Every game event reaches `EventSource`'s `message` handler, and the reducer switches on `type`.
 - The server sends no `retry:` field.
-- The keepalive is an SSE comment every 15 s (ADR 0010).
+- The keepalive is the event `keepalive` every 15 s, with `event: keepalive` and `data: {}` (ADR 0010).
+  It reaches only a `keepalive` listener, never the `message` handler, and its data means nothing; `EventSource` drops an event without data.
 
 ### Placing a Guess
 

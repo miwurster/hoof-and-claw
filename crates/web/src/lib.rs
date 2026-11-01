@@ -45,7 +45,7 @@ pub struct Config<C, F, S> {
     pub build: String,
     /// The directory holding the built app, with `index.html` at its root.
     pub app_dir: PathBuf,
-    /// How often an open stream gets a keepalive comment.
+    /// How often an open stream gets the keepalive event.
     pub keepalive: Duration,
     /// Which address a request comes from, for the limits.
     pub client_ip: ClientIp,

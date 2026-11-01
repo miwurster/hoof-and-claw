@@ -32,3 +32,15 @@ test(
     await alice.should.beRefusedAnotherTab("rateLimited");
   },
 );
+
+test(
+  "While no price changes, the stream sends a keepalive as a named event, which a page's EventSource counts as data, so the page keeps a healthy stream",
+  // API only: the page shows no keepalive; the hook's own test covers that it keeps the stream.
+  { tag: "@api" },
+  async ({ alice, priceSource }) => {
+    await priceSource.sends("64,000.00");
+    await alice.opensTheGame();
+
+    await alice.should.receiveAKeepalive();
+  },
+);

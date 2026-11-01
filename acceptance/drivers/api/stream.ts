@@ -60,8 +60,33 @@ export function apply(view: View, event: ServerEvent): void {
   }
 }
 
-/** Reads the stream's events, one `data:` line per event, until it ends or is aborted. */
-export async function read(body: ReadableStream<Uint8Array>, onEvent: (event: ServerEvent) => void): Promise<void> {
+/** Hands one event, given as its lines, to the listener its name picks, as `EventSource` does. */
+function dispatch(lines: string[], onEvent: (event: ServerEvent) => void, onKeepalive: () => void): void {
+  const name = lines
+    .find((line) => line.startsWith("event:"))
+    ?.slice("event:".length)
+    .trim();
+
+  if (name === "keepalive") {
+    onKeepalive();
+  } else if (name === undefined) {
+    for (const line of lines) {
+      if (line.startsWith("data:")) {
+        onEvent(decodeEvent(line.slice("data:".length).trim()));
+      }
+    }
+  }
+}
+
+/**
+ * Reads the stream's events, one `data:` line per event, until it ends or is aborted.
+ * As a page's `EventSource` does, it hands on only unnamed events; the named `keepalive` goes to `onKeepalive`.
+ */
+export async function read(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (event: ServerEvent) => void,
+  onKeepalive: () => void = () => {},
+): Promise<void> {
   const decoder = new TextDecoder();
   let buffer = "";
 
@@ -71,15 +96,8 @@ export async function read(body: ReadableStream<Uint8Array>, onEvent: (event: Se
     let end = buffer.indexOf("\n\n");
 
     while (end !== -1) {
-      const lines = buffer.slice(0, end).split("\n");
-
+      dispatch(buffer.slice(0, end).split("\n"), onEvent, onKeepalive);
       buffer = buffer.slice(end + 2);
-
-      for (const line of lines) {
-        if (line.startsWith("data:")) {
-          onEvent(decodeEvent(line.slice("data:".length).trim()));
-        }
-      }
 
       end = buffer.indexOf("\n\n");
     }
@@ -95,13 +113,14 @@ export async function follow(
   reopen: (signal: AbortSignal) => Promise<Response>,
   signal: AbortSignal,
   onEvent: (event: ServerEvent) => void,
+  onKeepalive: () => void,
 ): Promise<void> {
   let current: ReadableStream<Uint8Array> | null = body;
 
   while (!signal.aborted) {
     if (current !== null) {
       try {
-        await read(current, onEvent);
+        await read(current, onEvent, onKeepalive);
       } catch {
         // A stream the server lost reconnects as one it ended does.
       }

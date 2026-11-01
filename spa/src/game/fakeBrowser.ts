@@ -8,13 +8,16 @@ type Listener = (message: MessageEvent<string>) => void;
 export class FakeStream implements Stream {
   closed = false;
   private readonly messages: Listener[] = [];
+  private readonly keepalives: Listener[] = [];
   private readonly errors: (() => void)[] = [];
 
   constructor(readonly url: string) {}
 
-  addEventListener(type: "message" | "error", listener: Listener): void {
+  addEventListener(type: "message" | "keepalive" | "error", listener: Listener): void {
     if (type === "message") {
       this.messages.push(listener);
+    } else if (type === "keepalive") {
+      this.keepalives.push(listener);
     } else {
       this.errors.push(() => {
         listener(new MessageEvent("error"));
@@ -30,6 +33,15 @@ export class FakeStream implements Stream {
     const message = new MessageEvent("message", { data: JSON.stringify(event) });
 
     for (const listener of this.messages) {
+      listener(message);
+    }
+  }
+
+  /** Sends the server's keepalive, the named event `keepalive` with the data `{}` (ADR 0010). */
+  keepalive(): void {
+    const message = new MessageEvent("keepalive", { data: "{}" });
+
+    for (const listener of this.keepalives) {
       listener(message);
     }
   }

@@ -6,7 +6,10 @@ import type { Action, GameState } from "./reducer";
 
 /** The part of `EventSource` the hook uses. */
 export type Stream = {
-  addEventListener: (type: "message" | "error", listener: (message: MessageEvent<string>) => void) => void;
+  addEventListener: (
+    type: "message" | "keepalive" | "error",
+    listener: (message: MessageEvent<string>) => void,
+  ) => void;
   close: () => void;
 };
 
@@ -36,7 +39,7 @@ const theBrowser: Browser = {
   },
 };
 
-/** A stream without any data for this long is dead (ADR 0010). */
+/** A stream without any event, keepalives included, for this long is dead (ADR 0010). */
 const SILENCE_LIMIT_MS = 45_000;
 
 /** The first reconnect waits up to this long; every further one up to twice as long as the one before. */
@@ -135,6 +138,12 @@ class Connection {
       if (this.stream === opened) {
         this.listen();
         this.receive(decode<ServerEvent>(message.data));
+      }
+    });
+    // The keepalive carries no data; it only shows that the stream is alive (ADR 0010).
+    opened.addEventListener("keepalive", () => {
+      if (this.stream === opened) {
+        this.listen();
       }
     });
     opened.addEventListener("error", () => {

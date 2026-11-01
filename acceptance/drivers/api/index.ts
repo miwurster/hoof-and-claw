@@ -143,6 +143,10 @@ class ApiPlayer extends WithoutAPage {
     return this.streams.held(milliseconds);
   }
 
+  async expectsAKeepalive(): Promise<void> {
+    await this.streams.keptAlive();
+  }
+
   async expectsScore(score: number): Promise<void> {
     await this.streams.opened();
     await expect.poll(() => this.view.score, `the Player should have Score ${String(score)}`).toBe(score);

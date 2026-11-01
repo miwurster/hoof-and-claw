@@ -38,8 +38,9 @@ This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time deli
   A tab's Player events go into a queue bounded at 16 events.
   If the queue is full, the adapter closes that tab's stream.
   The client reconnects and gets a new snapshot, which already contains the Score and any Outcome it missed, so no resolution is lost.
-- **Keepalive.** The server sends an SSE comment every 15 s.
-  A client that receives nothing for 45 s treats the stream as dead and reconnects after a random delay.
+- **Keepalive.** The server sends the named event `keepalive` every 15 s.
+  It is an event and not an SSE comment, because `EventSource` never surfaces a comment, so a page could not tell a quiet healthy stream from a dead one.
+  A client that receives no event, keepalives included, for 45 s treats the stream as dead and reconnects after a random delay.
   Both values are configuration, with these defaults, and run on `tokio`'s real time like the throttle.
 
 ## The `Fanout` port
@@ -84,6 +85,12 @@ The scale path below splits `Fanout` into a price broadcast and Player notificat
 - **The fan-out as a plain in-process broadcast with no port, as ADR 0008 first said.** Rejected.
   A port with a recording fake makes the publishing order testable now, and it marks the seam the scale path needs.
 - **Two ports, one for prices and one for Player events.** Rejected for the demo; it is a step on the scale path.
+- **The keepalive as an SSE comment.** Rejected.
+  It was the first choice, but `EventSource` drops comments, so a page whose price did not change for 45 s dropped a healthy stream and showed Price delayed.
+- **The keepalive as a `keepalive` type in the events the reducer receives.** Rejected.
+  It would put a message about the connection among the game's events, and the reducer would need a case that does nothing.
+- **Reading the stream with `fetch` and a parser of its own, so comments count.** Rejected.
+  It replaces `EventSource` and its reconnect handling to work around something a named event avoids.
 
 ## Consequences
 

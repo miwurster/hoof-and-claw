@@ -44,6 +44,8 @@ export type PlayerDriver = {
   readonly expectsAnyPrice: () => Promise<void>;
   /** The stream stays open for this long without the server closing it; resolves early with how long it lasted. */
   readonly holdsTheStream: (milliseconds: number) => Promise<number>;
+  /** The stream brings the server's keepalive, a named event a page's `EventSource` counts as received data. */
+  readonly expectsAKeepalive: () => Promise<void>;
   readonly expectsScore: (score: number) => Promise<void>;
   readonly expectsNoOpenGuess: () => Promise<void>;
   readonly expectsGuessing: (possible: boolean) => Promise<void>;

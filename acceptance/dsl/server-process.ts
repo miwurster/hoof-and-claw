@@ -74,7 +74,8 @@ async function launch(
   const child = spawn("mise", ["run", "--quiet", "launch"], {
     cwd: join(import.meta.dirname, "..", ".."),
     detached: true,
-    env: { ...process.env, PORT: port, DATABASE_PATH: database, NO_COLOR: "1" },
+    // A keepalive every second, so a case sees one without waiting the 15 s default (ADR 0010).
+    env: { ...process.env, PORT: port, DATABASE_PATH: database, NO_COLOR: "1", SSE_KEEPALIVE_SECS: "1" },
     stdio: ["ignore", "pipe", "pipe"],
   });
 

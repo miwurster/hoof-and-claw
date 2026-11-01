@@ -67,8 +67,8 @@ pub(crate) async fn snapshot<C: Clock, F: Fanout, S: Store>(
     Ok(Json(ServerEvent::Snapshot(api.snapshot(player).await?)))
 }
 
-/// One stream per tab: the snapshot first, then every published price and the Player's events, with a comment as
-/// keepalive (ADR 0010).
+/// One stream per tab: the snapshot first, then every published price and the Player's events, with the named event
+/// `keepalive` in between (ADR 0010).
 ///
 /// An IP that already holds `MAX_STREAMS_PER_IP` open streams is refused with `rateLimited`.
 pub(crate) async fn events<C: Clock, F: Fanout, S: Store>(
@@ -101,5 +101,13 @@ pub(crate) async fn events<C: Clock, F: Fanout, S: Store>(
     let events = first
         .chain(later)
         .filter_map(|event| std::future::ready(Event::default().json_data(event).ok().map(Ok)));
-    Ok(Sse::new(events).keep_alive(KeepAlive::new().interval(api.keepalive)))
+    Ok(Sse::new(events).keep_alive(keepalive(api.keepalive)))
+}
+
+/// A named event and not a comment, because `EventSource` never surfaces a comment, and a page that sees no data for
+/// 45 s drops the stream. It carries data because `EventSource` drops an event without any (ADR 0010).
+fn keepalive(interval: Duration) -> KeepAlive {
+    KeepAlive::new()
+        .interval(interval)
+        .event(Event::default().event("keepalive").data("{}"))
 }

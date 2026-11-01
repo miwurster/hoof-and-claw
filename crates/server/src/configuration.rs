@@ -30,7 +30,7 @@ pub(crate) struct Configuration {
     #[arg(long, env = "RENDER_GIT_COMMIT", default_value = "dev")]
     pub(crate) build: String,
 
-    /// How often an open stream gets a keepalive comment, in seconds.
+    /// How often an open stream gets the keepalive event, in seconds.
     #[arg(long, env = "SSE_KEEPALIVE_SECS", default_value_t = 15)]
     pub(crate) sse_keepalive_secs: u64,
 

@@ -198,6 +198,9 @@ function acting(name: string, driver: PlayerDriver) {
     hearThePriceAnnouncedAs: async (announcement: "Price delayed" | "Price live"): Promise<void> => {
       await driver.expectsAnnouncement(announcement);
     },
+    receiveAKeepalive: async (): Promise<void> => {
+      await driver.expectsAKeepalive();
+    },
     beToldWhereTheScoreLives: async (): Promise<void> => {
       await driver.expectsWhereTheScoreLives();
     },

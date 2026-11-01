@@ -8,6 +8,7 @@ export class Streams {
   private controller = new AbortController();
   private reading: Promise<void>[] = [];
   private snapshots = 0;
+  private keepalives = 0;
 
   constructor(
     private readonly url: URL,
@@ -40,6 +41,12 @@ export class Streams {
     await expect.poll(() => this.snapshots, "the stream should open with a snapshot").toBeGreaterThan(0);
   }
 
+  /** Waits until the streams have brought a keepalive. */
+  async keptAlive(): Promise<void> {
+    await this.opened();
+    await expect.poll(() => this.keepalives, "the stream should bring a keepalive").toBeGreaterThan(0);
+  }
+
   /** Waits until the latest stream ends or `milliseconds` pass, and answers how long it stayed open. */
   async held(milliseconds: number): Promise<number> {
     await this.opened();
@@ -54,15 +61,24 @@ export class Streams {
     this.controller = new AbortController();
     this.reading = [];
     this.snapshots = 0;
+    this.keepalives = 0;
   }
 
   /** Follows the stream, and once the server ends or loses it, opens a new one as the page does. */
   private async follow(body: ReadableStream<Uint8Array>): Promise<void> {
     const reopen = (signal: AbortSignal) => fetch(this.url, { headers: this.headers(), signal });
 
-    await follow(body, reopen, this.controller.signal, (event) => {
-      this.snapshots += event.type === "snapshot" ? 1 : 0;
-      this.onEvent(event);
-    });
+    await follow(
+      body,
+      reopen,
+      this.controller.signal,
+      (event) => {
+        this.snapshots += event.type === "snapshot" ? 1 : 0;
+        this.onEvent(event);
+      },
+      () => {
+        this.keepalives += 1;
+      },
+    );
   }
 }

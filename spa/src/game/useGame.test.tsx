@@ -141,6 +141,24 @@ test("a stream without any data for 45 seconds is dead: the hook shows the price
   expect(page.latest().closed).toBe(false);
 });
 
+test("a stream that receives only keepalives for 45 seconds and more stays open", () => {
+  const page = fakeBrowser();
+  const { result } = renderHook(() => useGame(page.browser));
+
+  act(() => {
+    page.latest().emit(snapshot());
+
+    for (let second = 15; second <= 90; second += 15) {
+      vi.advanceTimersByTime(15_000);
+      page.latest().keepalive();
+    }
+  });
+
+  expect(page.opened).toHaveLength(1);
+  expect(page.latest().closed).toBe(false);
+  expect(result.current.state.delayed).toBe(false);
+});
+
 test("the hook closes the old stream before it opens a new one", () => {
   const page = fakeBrowser();
 
