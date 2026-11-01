@@ -80,10 +80,16 @@ export class Server {
     };
   }
 
-  /** Receives `SIGTERM`, as on a deploy, and stops. */
+  /**
+   * Receives `SIGTERM`, as on a deploy, and stops.
+   * The store recovers first: the server waits for a running save of resolutions, which never ends while saves fail.
+   */
   async stops(): Promise<void> {
+    const restart = this.restarting();
+
+    await restart.controls.setsStoreFailing("nothing");
     this.time = await this.driver.time();
-    this.stopped = await this.restarting().process.stops();
+    this.stopped = await restart.process.stops();
   }
 
   /**

@@ -9,12 +9,22 @@ import { WithoutTheApi } from "./without-the-api";
 
 const UNKNOWN_PAGE = "/a/page/that/does/not/exist";
 const GUESSES = "**/api/guesses";
+const EVENTS = "/api/events";
+
+/**
+ * How long the page may take to ask for its stream again, or to get it back: its reconnect backoff doubles from up to
+ * 1 s, so a few refused streams already mean waits of several seconds.
+ */
+const RECONNECT_TIMEOUT_MS = 20_000;
 
 /** The design token each standing of the difference is coloured with (docs/design/visual-direction.md). */
 const STANDING_COLOUR = { Correct: "--color-pasture", Wrong: "--color-rust", Unchanged: "--color-flint" } as const;
 
-/** The one refusal the page tells the Player about; for the others the page already shows why. */
-const RATE_LIMITED = "Too many guesses from your network. Try again in a minute.";
+/** The refusals the page tells the Player about; for the others the page already shows why. */
+const REFUSAL_MESSAGES: Partial<Record<string, string>> = {
+  rateLimited: "Too many guesses from your network. Try again in a minute.",
+  internal: "Couldn't place your guess. Try again.",
+};
 
 type Connection = {
   readonly baseURL: string;
@@ -35,6 +45,8 @@ class UiPlayer extends WithoutTheApi {
   private readonly openGuess;
   private readonly result;
   private held: Promise<Route> | undefined;
+  /** How many times the page has asked for its stream. */
+  private streamRequests = 0;
 
   constructor(
     private readonly context: BrowserContext,
@@ -48,6 +60,11 @@ class UiPlayer extends WithoutTheApi {
     this.announcement = this.price.getByRole("status");
     this.openGuess = page.getByRole("region", { name: "Open guess" });
     this.result = page.getByRole("region", { name: "Resolved guess" });
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === EVENTS) {
+        this.streamRequests += 1;
+      }
+    });
   }
 
   private button(direction: "Up" | "Down"): Locator {
@@ -223,11 +240,33 @@ class UiPlayer extends WithoutTheApi {
   }
 
   async expectsRefusal(refusal: string): Promise<void> {
-    if (refusal !== "rateLimited") {
+    const message = REFUSAL_MESSAGES[refusal];
+
+    if (message === undefined) {
       throw new Error(`the page shows no message for a Guess refused as ${refusal}`);
     }
 
-    await expect(this.page.getByText(RATE_LIMITED, { exact: true })).toBeVisible();
+    await expect(this.page.getByText(message, { exact: true })).toBeVisible();
+  }
+
+  /** Two more requests for the stream than when the check began: the page asked again, and again after a longer wait. */
+  async expectsReconnecting(): Promise<void> {
+    const before = this.streamRequests;
+
+    await expect
+      .poll(() => this.streamRequests, {
+        message: "the page should keep asking for its stream",
+        timeout: RECONNECT_TIMEOUT_MS,
+      })
+      .toBeGreaterThanOrEqual(before + 2);
+  }
+
+  /** Only a snapshot ends Price delayed on a page that lost its stream, so a live price shows the stream is back. */
+  async expectsTheGameBack(): Promise<void> {
+    await expect(
+      this.price.getByText("Price delayed", { exact: true }),
+      "the page should get its stream back",
+    ).toHaveCount(0, { timeout: RECONNECT_TIMEOUT_MS });
   }
 
   async expectsEverythingByRoleAndName(): Promise<void> {

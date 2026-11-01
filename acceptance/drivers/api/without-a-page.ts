@@ -46,6 +46,14 @@ export class WithoutAPage {
     return Promise.reject(new Error("the API has no focus ring"));
   }
 
+  expectsReconnecting(): Promise<void> {
+    return Promise.reject(new Error("the API driver does not ask again for a refused stream; the page reconnects"));
+  }
+
+  expectsTheGameBack(): Promise<void> {
+    return Promise.reject(new Error("the API driver does not ask again for a refused stream; the page reconnects"));
+  }
+
   losesTheNetwork(): Promise<void> {
     return Promise.reject(new Error("the API driver has no network to lose; the page reconnects, not the API"));
   }

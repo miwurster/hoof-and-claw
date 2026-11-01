@@ -13,8 +13,9 @@ export type Connection = {
 /** A side a Guess takes. */
 export type Direction = "Up" | "Down";
 
-/** Why the server refuses a Guess, or a visitor. */
-export type Refusal = "openGuessExists" | "priceDelayed" | "invalidDirection" | "badRequest" | "rateLimited";
+/** Why the server refuses a Guess, or a visitor; `internal` when it cannot answer, as while the store is down. */
+export type Refusal =
+  "openGuessExists" | "priceDelayed" | "invalidDirection" | "badRequest" | "rateLimited" | "internal";
 
 /** The result of a Resolved guess. */
 export type Outcome = "Correct" | "Wrong";
@@ -35,6 +36,12 @@ export type PlayerDriver = {
   readonly closesTheGame: () => Promise<void>;
   /** Opens one more stream of the game, and answers the error code it was refused with, or `null`. */
   readonly triesToOpenTheGame: () => Promise<string | null>;
+  /** Reads the snapshot alone, and answers the error code it was refused with, or `null`. */
+  readonly triesToReadTheSnapshot: () => Promise<string | null>;
+  /** The page asks for its stream again and again while the server refuses it. */
+  readonly expectsReconnecting: () => Promise<void>;
+  /** The page has its stream back, with a snapshot, after its reconnect backoff. */
+  readonly expectsTheGameBack: () => Promise<void>;
   readonly losesTheNetwork: () => Promise<void>;
   readonly regainsTheNetwork: () => Promise<void>;
   readonly expectsTheGame: () => Promise<void>;
@@ -108,14 +115,18 @@ export type ServerDriver = {
   readonly close: () => Promise<void>;
 };
 
-/** The test controls: the Price source and the clock. Prices are dollar strings such as "64,000.00". */
+/** What the store fails: nothing, every save of resolutions, or every read and write. */
+export type StoreFailure = "nothing" | "resolutions" | "everything";
+
+/** The test controls: the Price source, the clock and the store. Prices are dollar strings such as "64,000.00". */
 export type ControlsDriver = {
   readonly sendsPrice: (price: string) => Promise<void>;
   readonly setsConnected: (connected: boolean) => Promise<void>;
   readonly advancesClock: (milliseconds: number) => Promise<void>;
   readonly setsClock: (time: string) => Promise<void>;
-  /** Puts the Price source back into its start state: Price delayed and no price. */
-  readonly resetsPriceSource: () => Promise<void>;
+  readonly setsStoreFailing: (failure: StoreFailure) => Promise<void>;
+  /** Puts the Price source back into its start state, Price delayed and no price, and makes the store fail nothing. */
+  readonly resets: () => Promise<void>;
   readonly close: () => Promise<void>;
 };
 

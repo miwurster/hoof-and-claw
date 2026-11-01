@@ -10,6 +10,7 @@ import { Player } from "./player";
 import { Players } from "./players";
 import { PriceSource } from "./price-source";
 import { Server } from "./server";
+import { Store } from "./store";
 import { startServer } from "./server-process";
 import type { ServerProcess } from "./server-process";
 
@@ -25,6 +26,7 @@ type Actors = {
   readonly neighbours: Neighbours;
   readonly priceSource: PriceSource;
   readonly clock: Clock;
+  readonly store: Store;
   readonly server: Server;
   /** A group of this many Players under load, each from a network of their own (ADR 0015). */
   readonly players: (count: number) => Promise<Players>;
@@ -130,12 +132,13 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     await Promise.all(joined.map((driver) => driver.close()));
   },
 
-  // Every test starts with the Price source in its start state: Price delayed and no price (ADR 0011).
+  // Every test starts with the Price source in its start state, Price delayed and no price, and a store that fails
+  // nothing (ADR 0011).
   controls: [
     async ({ drivers, connect }, use) => {
       const driver = await drivers.controls(connect(freshNetwork()));
 
-      await driver.resetsPriceSource();
+      await driver.resets();
       await use(driver);
       await driver.close();
     },
@@ -148,6 +151,10 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
 
   clock: async ({ controls }, use) => {
     await use(new Clock(controls));
+  },
+
+  store: async ({ controls }, use) => {
+    await use(new Store(controls));
   },
 
   server: async ({ drivers, serverProcess, connect, controls, priceSource }, use) => {

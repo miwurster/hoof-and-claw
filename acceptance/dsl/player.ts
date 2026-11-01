@@ -204,6 +204,31 @@ function acting(name: string, driver: PlayerDriver) {
     beToldWhereTheScoreLives: async (): Promise<void> => {
       await driver.expectsWhereTheScoreLives();
     },
+    /** Is refused the game's stream, with an error code such as "internal". */
+    beRefusedTheGame: async (refusal: Refusal): Promise<void> => {
+      const answer = await driver.triesToOpenTheGame();
+
+      expect(answer, `${name} should be refused the game as ${refusal}, but got ${String(answer)}`).toBe(refusal);
+    },
+    /** Is refused the snapshot of the game, with an error code such as "internal". */
+    beRefusedTheSnapshot: async (refusal: Refusal): Promise<void> => {
+      const answer = await driver.triesToReadTheSnapshot();
+
+      expect(answer, `${name} should be refused the snapshot as ${refusal}, but got ${String(answer)}`).toBe(refusal);
+    },
+    beServedTheSnapshot: async (): Promise<void> => {
+      const answer = await driver.triesToReadTheSnapshot();
+
+      expect(answer, `${name} should be served the snapshot, but was refused as ${String(answer)}`).toBeNull();
+    },
+    /** Keeps asking for the game again while the server refuses it, as the page does with its growing backoff. */
+    keepReconnecting: async (): Promise<void> => {
+      await driver.expectsReconnecting();
+    },
+    /** Gets the game back once the server answers again, after the page's reconnect backoff. */
+    getTheGameBack: async (): Promise<void> => {
+      await driver.expectsTheGameBack();
+    },
     /** Is refused one more tab of the game, with an error code such as "rateLimited". */
     beRefusedAnotherTab: async (refusal: Refusal): Promise<void> => {
       const answer = await driver.triesToOpenTheGame();

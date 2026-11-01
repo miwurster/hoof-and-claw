@@ -96,6 +96,13 @@ class ApiPlayer extends WithoutAPage {
     return response.ok ? null : (await decode<ErrorBody>(response)).error;
   }
 
+  /** Reads the snapshot alone; the answer is the error code it was refused with, or `null` when it was served. */
+  async triesToReadTheSnapshot(): Promise<ErrorCode | null> {
+    const response = await this.request.get("/api/snapshot", { headers: this.headers() });
+
+    return response.ok() ? null : (await decode<ErrorBody>(response)).error;
+  }
+
   async guesses(direction: "Up" | "Down"): Promise<void> {
     const command: PlaceGuess = { direction: wire(direction) };
 

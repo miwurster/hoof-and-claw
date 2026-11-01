@@ -1,7 +1,7 @@
-// The controls driver: the test controls' endpoints, which set the price and the time.
+// The controls driver: the test controls' endpoints, which set the price and the time and make the store fail.
 import { expect } from "@playwright/test";
 import type { APIRequest, APIResponse, Browser } from "@playwright/test";
-import type { AdvanceClock, SendPrice, SetClock, SetConnection } from "contract/test-controls";
+import type { AdvanceClock, SendPrice, SetClock, SetConnection, SetStore, StoreFailure } from "contract/test-controls";
 
 type Connection = {
   readonly baseURL: string;
@@ -49,8 +49,13 @@ export async function controls(connection: Connection) {
 
       done(await request.post("/test-controls/clock", { data }), `set the clock to ${time}`);
     },
-    resetsPriceSource: async () => {
-      done(await request.post("/test-controls/reset"), "reset the Price source");
+    setsStoreFailing: async (fails: StoreFailure) => {
+      const data: SetStore = { fails };
+
+      done(await request.post("/test-controls/store", { data }), `make the store fail ${fails}`);
+    },
+    resets: async () => {
+      done(await request.post("/test-controls/reset"), "reset the Price source and the store");
     },
     close: async () => {
       await request.dispose();

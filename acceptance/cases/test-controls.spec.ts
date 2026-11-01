@@ -1,10 +1,10 @@
 import { seconds, test } from "../dsl";
 
 test(
-  "The test controls send a price, lose or restore the connection to the Price source, advance the clock, and set the clock; the clock stands still until a command moves it",
+  "The test controls send a price, lose or restore the connection to the Price source, advance the clock, set the clock, and make the store fail resolutions or everything until it recovers; the clock stands still until a command moves it",
   // API only: the page does not show the server's time.
   { tag: "@api" },
-  async ({ alice, priceSource, clock, server }) => {
+  async ({ alice, priceSource, clock, store, server }) => {
     await alice.opensTheGame();
 
     await priceSource.sends("64,000.00");
@@ -20,5 +20,12 @@ test(
 
     await clock.advances(seconds(60));
     await server.should.tellTheTime("2027-03-01T08:31:00Z");
+
+    await store.failsResolutions();
+    await alice.should.beServedTheSnapshot();
+    await store.goesDown();
+    await alice.should.beRefusedTheSnapshot("internal");
+    await store.recovers();
+    await alice.should.beServedTheSnapshot();
   },
 );

@@ -27,6 +27,9 @@ export default defineConfig<Options>({
   forbidOnly: true,
   retries: 0,
   fullyParallel: false,
+  // A failed save of resolutions is tried again after up to 5 s of real time, so a resolution may take that long to
+  // show once the store recovers; every waiting assertion allows twice that.
+  expect: { timeout: 10_000 },
   reporter: process.env["CI"] === undefined ? "list" : [["list"], ["html", { open: "never" }]],
   use: {
     ...devices["Desktop Chrome"],

@@ -22,6 +22,10 @@ export class WithoutTheApi {
     return Promise.reject(new Error("a page holds one stream; only the API can open more"));
   }
 
+  triesToReadTheSnapshot(): Promise<null> {
+    return Promise.reject(new Error("the page reads the snapshot only from its stream; only the API reads it alone"));
+  }
+
   holdsTheStream(): Promise<number> {
     return Promise.reject(new Error("the page reconnects its stream by itself; hold the stream through the API"));
   }
