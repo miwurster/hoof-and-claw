@@ -43,6 +43,16 @@ impl ClientIp {
             .or_else(|| peer.map(|peer| peer.ip()))
     }
 
+    /// The address of a request, from its headers and the peer address the server accepted it from.
+    #[must_use]
+    pub fn of_request<T>(&self, request: &Request<T>) -> Option<IpAddr> {
+        let peer = request
+            .extensions()
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|ConnectInfo(peer)| *peer);
+        self.of(request.headers(), peer)
+    }
+
     fn forwarded(&self, headers: &HeaderMap) -> Option<IpAddr> {
         // Several header lines read as one list, in order (RFC 9110, section 5.3).
         let entries: Vec<&str> = headers
@@ -61,11 +71,7 @@ impl KeyExtractor for ClientIp {
     type Key = IpAddr;
 
     fn extract<T>(&self, request: &Request<T>) -> Result<IpAddr, GovernorError> {
-        let peer = request
-            .extensions()
-            .get::<ConnectInfo<SocketAddr>>()
-            .map(|ConnectInfo(peer)| *peer);
-        self.of(request.headers(), peer)
+        self.of_request(request)
             .ok_or(GovernorError::UnableToExtractKey)
     }
 }
