@@ -1,7 +1,7 @@
 # Time log
 
 This log is a rough estimate of the time per day, in Berlin time, that went into this repo through Claude Code sessions.
-`Active` is time the human and the agent worked together; `AFK` is time an agent ran unattended through `kipu-herd`.
+`Active` is time the human and the agent worked together; `AFK` is time an agent ran unattended.
 Pauses over 15 minutes count zero, parallel sessions count once, and sessions spent on this log count zero.
 The agent updates this file on request as described in `docs/agents/time-log.md`.
 
@@ -14,5 +14,5 @@ Later features reuse this groundwork instead of building it again.
 | ---------- | -------------- | -------------- | -------- |
 | 2026-10-30 | 0 h 15 min     | 0 h 00 min     | 3        |
 | 2026-10-31 | 6 h 15 min     | 2 h 00 min     | 25       |
-| 2026-11-01 | 2 h 55 min     | 0 h 55 min     | 16       |
-| **Total**  | **9 h 25 min** | **2 h 55 min** |          |
+| 2026-11-01 | 2 h 55 min     | 1 h 50 min     | 15       |
+| **Total**  | **9 h 25 min** | **3 h 50 min** |          |

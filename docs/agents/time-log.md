@@ -13,7 +13,7 @@ Claude Code deletes transcripts after 30 days by default, so a day older than th
 
 ## AFK sessions
 
-An AFK session is one where the human invoked the `kipu-herd` skill: a `user` line's text content, not a tool result, holds a `<command-name>` that ends in `kipu-herd`, such as `/wuddi:kipu-herd`.
+An AFK session is one where the human invoked the `kipu-herd` or `kipu-ship` skill: a `user` line's text content, not a tool result, holds a `<command-name>` that ends in `kipu-herd` or `kipu-ship`, such as `/wuddi:kipu-herd`.
 Every other session is attended.
 
 ## Time-log sessions
