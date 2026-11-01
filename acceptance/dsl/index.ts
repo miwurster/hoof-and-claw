@@ -2,7 +2,7 @@
 import { test as base } from "@playwright/test";
 
 import { Clock } from "./clock";
-import type { ControlsDriver, Drivers, MeasuredPlayers, PlayerDriver } from "./drivers";
+import type { Connection, ControlsDriver, Drivers, MeasuredPlayers, PlayerDriver } from "./drivers";
 import { Measurements } from "./measurements";
 import type { Budgets } from "./measurements";
 import { freshNetwork, Neighbours } from "./network";
@@ -35,6 +35,8 @@ type Infrastructure = {
   readonly network: string;
   readonly controls: ControlsDriver;
   readonly serverLog: void;
+  /** How a driver reaches the worker's server from a network. */
+  readonly connect: (network: string) => Connection;
 };
 
 export type Options = {
@@ -89,46 +91,35 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     { scope: "worker" },
   ],
 
+  connect: async ({ serverProcess, browser, playwright }, use) => {
+    await use((network) => ({ baseURL: serverProcess.baseURL, browser, request: playwright.request, network }));
+  },
+
   // oxlint-disable-next-line no-empty-pattern -- Playwright requires an object pattern for a fixture without dependencies.
   network: async ({}, use) => {
     await use(freshNetwork());
   },
 
-  alice: async ({ drivers, serverProcess, browser, playwright, network }, use) => {
-    const driver = await drivers.player({
-      baseURL: serverProcess.baseURL,
-      browser,
-      request: playwright.request,
-      network,
-    });
+  alice: async ({ drivers, connect, network }, use) => {
+    const driver = await drivers.player(connect(network));
 
     await use(new Player("Alice", driver));
     await driver.close();
   },
 
-  bob: async ({ drivers, serverProcess, browser, playwright }, use) => {
-    const driver = await drivers.player({
-      baseURL: serverProcess.baseURL,
-      browser,
-      request: playwright.request,
-      network: freshNetwork(),
-    });
+  bob: async ({ drivers, connect }, use) => {
+    const driver = await drivers.player(connect(freshNetwork()));
 
     await use(new Player("Bob", driver));
     await driver.close();
   },
 
-  neighbours: async ({ drivers, serverProcess, browser, playwright, network }, use) => {
+  neighbours: async ({ drivers, connect, network }, use) => {
     const joined: PlayerDriver[] = [];
 
     await use(
       new Neighbours(async (name) => {
-        const driver = await drivers.player({
-          baseURL: serverProcess.baseURL,
-          browser,
-          request: playwright.request,
-          network,
-        });
+        const driver = await drivers.player(connect(network));
 
         joined.push(driver);
 
@@ -140,13 +131,8 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
 
   // Every test starts with the Price source in its start state: Price delayed and no price (ADR 0011).
   controls: [
-    async ({ drivers, serverProcess, browser, playwright }, use) => {
-      const driver = await drivers.controls({
-        baseURL: serverProcess.baseURL,
-        browser,
-        request: playwright.request,
-        network: freshNetwork(),
-      });
+    async ({ drivers, connect }, use) => {
+      const driver = await drivers.controls(connect(freshNetwork()));
 
       await driver.resetsPriceSource();
       await use(driver);
@@ -163,13 +149,8 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
     await use(new Clock(controls));
   },
 
-  server: async ({ drivers, serverProcess, browser, playwright, controls, priceSource }, use) => {
-    const driver = await drivers.server({
-      baseURL: serverProcess.baseURL,
-      browser,
-      request: playwright.request,
-      network: freshNetwork(),
-    });
+  server: async ({ drivers, serverProcess, connect, controls, priceSource }, use) => {
+    const driver = await drivers.server(connect(freshNetwork()));
 
     const server = new Server(driver, serverProcess.build, { process: serverProcess, controls, priceSource });
 
@@ -184,20 +165,13 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
   },
 
   // Every case writes its numbers to measurements.json in its output folder, which CI keeps as an artefact.
-  players: async ({ measuring, serverProcess, browser, playwright }, use, testInfo) => {
+  players: async ({ measuring, serverProcess, connect }, use, testInfo) => {
     const measurements = new Measurements(measuring.budgets);
     const groups: Players[] = [];
 
     await use(async (count) => {
       const drivers = await Promise.all(
-        Array.from({ length: count }, () =>
-          measuring.players({
-            baseURL: serverProcess.baseURL,
-            browser,
-            request: playwright.request,
-            network: freshNetwork(),
-          }),
-        ),
+        Array.from({ length: count }, () => measuring.players(connect(freshNetwork()))),
       );
 
       const group = new Players(drivers, measurements, serverProcess.residentMemory);
