@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use game::{Clock, Game, Recording};
 use jiff::{SignedDuration, Timestamp};
-use prices::{Price, PriceSource, Report};
+use prices::{Price, PriceSource, Report, Source};
 use tokio::sync::mpsc;
 
 use crate::support::Stores;
@@ -31,6 +31,10 @@ impl Clock for MovableClock {
 struct FakeSource(mpsc::UnboundedReceiver<Report>);
 
 impl PriceSource for FakeSource {
+    fn source(&self) -> Source {
+        Source::Bitstamp
+    }
+
     async fn next(&mut self) -> Option<Report> {
         self.0.recv().await
     }

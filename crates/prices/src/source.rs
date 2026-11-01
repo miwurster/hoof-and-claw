@@ -1,6 +1,6 @@
 //! The `PriceSource` port: what the Price source reports, one report at a time.
 
-use crate::{Price, TradeId};
+use crate::{Price, Source, TradeId};
 
 /// One thing the Price source reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -15,6 +15,9 @@ pub enum Report {
 
 /// Delivers what the Price source reports, in the order it happened.
 pub trait PriceSource: Send + 'static {
+    /// The Price source every price this adapter delivers comes from.
+    fn source(&self) -> Source;
+
     /// Waits for the next report, or `None` once the source has ended.
     ///
     /// The future must be cancel-safe: dropping it before it completes loses no report.

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt as _, StreamExt as _};
-use prices::{Price, PriceSource, Report, TradeId};
+use prices::{Price, PriceSource, Report, Source, TradeId};
 use rustls::ClientConfig;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
@@ -80,6 +80,10 @@ impl Bitstamp {
 }
 
 impl PriceSource for Bitstamp {
+    fn source(&self) -> Source {
+        Source::Bitstamp
+    }
+
     async fn next(&mut self) -> Option<Report> {
         self.reports.recv().await
     }

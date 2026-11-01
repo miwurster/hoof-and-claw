@@ -160,7 +160,8 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     /// Returns once the game shuts down, after the save of any resolution it is running.
     pub async fn run(&self, source: impl PriceSource) {
         let (arrived, arrivals) = mpsc::unbounded_channel();
-        tokio::join!(self.take_in(source, arrived), self.handle(arrivals));
+        let from = source.source();
+        tokio::join!(self.take_in(source, arrived), self.handle(from, arrivals));
     }
 
     /// Stamps every report with the time it arrived at, until the source ends or the game shuts down.
@@ -181,7 +182,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     }
 
     /// Resolves and publishes every report in the order it arrived.
-    async fn handle(&self, mut arrivals: mpsc::UnboundedReceiver<Arrival>) {
+    async fn handle(&self, from: Source, mut arrivals: mpsc::UnboundedReceiver<Arrival>) {
         let mut last_price_sent: Option<Instant> = None;
         let mut pending = false;
         let mut shutting_down = self.shutting_down.subscribe();
@@ -193,10 +194,9 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
                 arrival = arrivals.recv() => {
                     let Some(Arrival { report, at }) = arrival else { return };
                     if let Report::Received(price, trade_id) = report {
-                        // The controllable source of the test controls stands in for Bitstamp.
                         let received = ReceivedPrice {
                             price,
-                            source: Source::Bitstamp,
+                            source: from,
                             trade_id,
                             received_at: at,
                         };

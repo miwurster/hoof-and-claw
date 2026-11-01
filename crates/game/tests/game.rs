@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use game::{Clock, Game, Recording};
 use jiff::Timestamp;
-use prices::{LatestPrice, Price, PriceSource, Report};
+use prices::{LatestPrice, Price, PriceSource, Report, Source};
 use support::Stores;
 use tokio::sync::mpsc;
 
@@ -25,6 +25,10 @@ impl Clock for FixedClock {
 struct FakeSource(mpsc::UnboundedReceiver<Report>);
 
 impl PriceSource for FakeSource {
+    fn source(&self) -> Source {
+        Source::Bitstamp
+    }
+
     async fn next(&mut self) -> Option<Report> {
         self.0.recv().await
     }

@@ -1,6 +1,6 @@
 use futures_channel::mpsc;
 use futures_util::StreamExt as _;
-use prices::{Price, PriceSource, Report};
+use prices::{Price, PriceSource, Report, Source};
 
 /// A `PriceSource` that reports what its `SourceControls` tell it to.
 pub struct ControllableSource {
@@ -46,6 +46,11 @@ impl SourceControls {
 }
 
 impl PriceSource for ControllableSource {
+    /// The controllable source stands in for Bitstamp, the only Price source the demo may use (ADR 0004).
+    fn source(&self) -> Source {
+        Source::Bitstamp
+    }
+
     async fn next(&mut self) -> Option<Report> {
         self.reports.next().await
     }
