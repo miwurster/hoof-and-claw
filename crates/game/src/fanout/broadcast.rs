@@ -73,6 +73,11 @@ impl Fanout for Broadcast {
         let (sender, receiver) = mpsc::channel(PLAYER_EVENT_QUEUE);
         let mut registry = self.registry();
         if !registry.closed {
+            // A visitor's waiting Player ID may never get an event, so closed streams are swept here as well.
+            registry.streams.retain(|_, streams| {
+                streams.retain(|stream| !stream.is_closed());
+                !streams.is_empty()
+            });
             registry.streams.entry(player).or_default().push(sender);
         }
         Subscription::new(price, Some(receiver))
@@ -85,5 +90,33 @@ impl Fanout for Broadcast {
         self.price
             .send_modify(|delivery| *delivery = Delivery::Closed(delivery.latest()));
         registry.streams.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use guessing::PlayerId;
+    use jiff::Timestamp;
+
+    use super::{Broadcast, Fanout};
+
+    const AT: Timestamp = Timestamp::constant(1_798_761_600, 0);
+
+    fn player(byte: u8) -> PlayerId {
+        PlayerId::new(AT, [byte; 10])
+    }
+
+    #[test]
+    fn a_closed_stream_leaves_nothing_in_the_registry() {
+        let fanout = Broadcast::new();
+        // Each visitor's stream subscribes under its own waiting Player ID, which never gets an event.
+        for byte in 0..100 {
+            drop(fanout.subscribe(Some(player(byte))));
+        }
+
+        let _open = fanout.subscribe(Some(player(200)));
+
+        let held: usize = fanout.registry().streams.values().map(Vec::len).sum();
+        assert_eq!(held, 1, "only the open stream should be held");
     }
 }
