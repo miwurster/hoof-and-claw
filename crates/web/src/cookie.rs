@@ -1,12 +1,12 @@
 //! The identity cookie: issued on the first visit, re-issued with a fresh expiry on every later one (ADR 0001), and
 //! limited per IP.
 
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::extract::{ConnectInfo, Request, State};
+use axum::extract::{Request, State};
 use axum::http::header::{CONTENT_TYPE, COOKIE, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue};
 use axum::middleware::Next;
@@ -49,14 +49,11 @@ impl Cookies {
         }
     }
 
-    fn identity(&self, headers: &HeaderMap, peer: Option<SocketAddr>) -> Identity {
+    fn identity(&self, headers: &HeaderMap, ip: Option<IpAddr>) -> Identity {
         if let Some(token) = sent(headers) {
             return Identity::Sent(token);
         }
-        let allowed = self
-            .client_ip
-            .of(headers, peer)
-            .is_none_or(|ip| self.issued.check_key(&ip).is_ok());
+        let allowed = ip.is_none_or(|ip| self.issued.check_key(&ip).is_ok());
         if !allowed {
             return Identity::RateLimited;
         }
@@ -70,7 +67,8 @@ pub(crate) async fn on_every_response(
     mut request: Request,
     next: Next,
 ) -> Response {
-    let token = match cookies.identity(request.headers(), peer(&request)) {
+    let ip = cookies.client_ip.of_request(&request);
+    let token = match cookies.identity(request.headers(), ip) {
         Identity::Sent(token) | Identity::Issued(token) => token,
         Identity::RateLimited => return ErrorCode::RateLimited.into_response(),
         Identity::Unavailable => return ErrorCode::Internal.into_response(),
@@ -88,7 +86,7 @@ pub(crate) async fn on_the_page(
     next: Next,
 ) -> Response {
     let headers = request.headers().clone();
-    let peer = peer(&request);
+    let ip = cookies.client_ip.of_request(&request);
     let mut response = next.run(request).await;
     let is_page = response
         .headers()
@@ -99,19 +97,12 @@ pub(crate) async fn on_the_page(
     if !is_page {
         return response;
     }
-    match cookies.identity(&headers, peer) {
+    match cookies.identity(&headers, ip) {
         Identity::Sent(token) | Identity::Issued(token) => set(&mut response, &token),
         Identity::RateLimited => {}
         Identity::Unavailable => return ErrorCode::Internal.into_response(),
     }
     response
-}
-
-fn peer(request: &Request) -> Option<SocketAddr> {
-    request
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|ConnectInfo(peer)| *peer)
 }
 
 fn sent(headers: &HeaderMap) -> Option<Token> {
