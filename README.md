@@ -329,3 +329,7 @@ Terraform describes the Render service; `infra/README.md` says how to apply it.
 
 None of these is needed to understand this README:
 `ARCHITECTURE.md` (where code goes and which test enforces each rule), `CODING_STANDARDS.md`, `GLOSSARY.md`, and the decision records in `docs/adr/`.
+
+## License
+
+MIT, see `LICENSE`.
