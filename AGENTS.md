@@ -9,7 +9,7 @@ Read `ARCHITECTURE.md` before you add a crate, package, module, port or adapter,
 ## Working rules
 
 - Run `mise run gate` before you hand work over; it is the Green gate.
-- Prove a finished change with the `verification` skill.
+- Prove a finished change with the `verification` skill in a fresh subagent, briefed only with what was asked and where the change lives, so the proof stays independent of the session that made the change.
 - The ADRs in `docs/adr/` hold the reasons; `ARCHITECTURE.md`, `CODING_STANDARDS.md` and `docs/agents/verification.md` hold the rules.
   An ADR change that changes a rule updates the file holding that rule in the same commit.
 
