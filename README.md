@@ -64,7 +64,7 @@ flowchart LR
 | Every trade is processed; while the feed is down the price is "Price delayed" and new Guesses are refused. | A Guess must start from a price the server knows to be current. Open guesses wait for the feed to come back instead of being voided. | Sampling the price on a timer, or voiding Guesses after an outage. |
 | One SSE stream per tab, opening with a snapshot. | The server only pushes, SSE carries the identity cookie, and a reconnect rebuilds the whole state from the snapshot, so nothing is lost or applied twice. | WebSockets, polling, or replaying missed events. |
 | Save first, publish second. | A Player never sees an Outcome that a failed save then loses. | Publishing before the write is durable. |
-| SQLite on a disk, in WAL mode, with one writing connection. | One instance needs no database server; SQLite handles thousands of writes a second, far beyond the demo. | Managed Postgres, which doubles the cost and adds a network hop. |
+| SQLite on a disk, in WAL mode with `synchronous=NORMAL`, with one writing connection. | One instance needs no database server. SQLite syncs to disk only at a checkpoint, so it handles thousands of writes a second, far beyond the demo. Syncing on every commit put 200 Guesses placed at once over their 100 ms budget. | Managed Postgres, which doubles the cost and adds a network hop. |
 | Rust (axum, tokio, sqlx), with crates cut by area of the game and ports and adapters. | Agents write the code, so the compiler and crate boundaries enforce the rules a human reviewer would otherwise check. The price source, store, clock, identity and event delivery are swappable without touching the game rules. | TypeScript on the server, or layers like `models/` and `services/`. |
 | Prices are integer cents. | Comparing with the Start price is the only arithmetic, and integers compare exactly. | Floating point, or a decimal library. |
 | An anonymous random token in an `HttpOnly` cookie identifies a Player. | No sign-up for a demo, and JavaScript never sees the token. Sign-in methods can attach to an existing Player later without merging Scores. | Accounts and login, or a token in `localStorage`. |
@@ -79,6 +79,10 @@ flowchart LR
   A Guess that falls due during the downtime resolves on the first changed price after the restart, a few seconds later than it otherwise would.
 - **There is no database backup.**
   Losing the disk resets every Score to 0, which is acceptable for a three-month demo.
+- **A crash of the operating system can lose the last few writes.**
+  SQLite syncs to disk only at a checkpoint, so a saved Guess or Outcome survives a deploy or a crash of the server, but the writes since the last checkpoint may not survive a power loss.
+  The database stays consistent.
+  A Player may lose a Guess or a Score change from the last moments before the crash.
 - **There is one price source.**
   If Bitstamp is unreachable, the game shows "Price delayed" and refuses new Guesses until the feed returns.
 - **There is one instance, with no redundancy.**
