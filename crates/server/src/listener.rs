@@ -18,7 +18,8 @@ pub(crate) fn listen(port: u16) -> std::io::Result<TcpListener> {
 }
 
 // Linux drops a connection attempt that overflows the backlog, and the client retries it only after a second.
-// macOS caps every backlog at its `kern.ipc.somaxconn` of 128 and refuses the rest, so the test runs on Linux only.
+// macOS keeps a backlog of 1024 too, but it resets an overflowing attempt only in some runs: with a backlog of 128 the
+// test fails there in about one run in four. So the test runs on Linux only, where it fails every time.
 #[cfg(all(test, target_os = "linux"))]
 mod tests {
     use std::net::SocketAddr;
@@ -43,15 +44,15 @@ mod tests {
         let attempts: Vec<_> = (0..AT_ONCE)
             .map(|_| tokio::spawn(timeout(WITHOUT_A_RETRY, TcpStream::connect(address))))
             .collect();
-        let mut dropped = 0;
+        let mut lost = 0;
         for attempt in attempts {
-            if attempt.await.unwrap().is_err() {
-                dropped += 1;
+            if !matches!(attempt.await.unwrap(), Ok(Ok(_))) {
+                lost += 1;
             }
         }
 
         assert_eq!(
-            dropped, 0,
+            lost, 0,
             "every connection should be kept until it is accepted"
         );
     }

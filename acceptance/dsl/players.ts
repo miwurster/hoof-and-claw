@@ -30,11 +30,28 @@ async function each<Result>(
     if (outcome.status === "fulfilled") {
       results.push(outcome.value);
     } else {
-      errors.push(`Player ${String(index + 1)}: ${String(outcome.reason)}`);
+      const reason = outcome.reason instanceof Error ? withCauses(outcome.reason) : String(outcome.reason);
+
+      errors.push(`Player ${String(index + 1)}: ${reason}`);
     }
   }
 
   return { results, errors };
+}
+
+/** An error with the chain of its causes: `fetch` says only "fetch failed" and names the network error in its cause. */
+function withCauses(error: Error): string {
+  const chain: string[] = [];
+
+  for (let current: Error | undefined = error; current !== undefined; current = causeOf(current)) {
+    chain.push(String(current));
+  }
+
+  return chain.join(", caused by ");
+}
+
+function causeOf(error: Error): Error | undefined {
+  return error.cause instanceof Error ? error.cause : undefined;
 }
 
 /** Many Players at once, each with one stream, acting together. */
