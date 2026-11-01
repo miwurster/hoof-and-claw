@@ -3,11 +3,12 @@
 use futures_executor::block_on;
 use guessing::{Direction, GuessId, OpenGuess, PlayerId, ResolvedGuess, Store as _, StoreError};
 use identity::{Store as _, Token};
-use jiff::{SignedDuration, Timestamp};
+use jiff::Timestamp;
 use prices::{Price, ReceivedPrice, Source};
 use test_controls::{ControllableStore, Failing, controllable_store};
 
 const PLACED_AT: Timestamp = Timestamp::constant(1_798_761_600, 0);
+const RESOLVED_AT: Timestamp = Timestamp::constant(1_798_761_661, 0);
 
 #[derive(Clone)]
 struct Joined {
@@ -79,11 +80,13 @@ fn guess(byte: u8) -> OpenGuess {
     }
 }
 
+/// The Guess resolved by a changed price received 61 seconds after it was placed.
+#[expect(
+    clippy::unwrap_used,
+    reason = "a changed price received after 60 seconds always resolves a Guess"
+)]
 fn resolved(guess: OpenGuess) -> ResolvedGuess {
-    let at = PLACED_AT
-        .checked_add(SignedDuration::from_secs(61))
-        .unwrap();
-    guess.resolve(price(6_400_100, at)).unwrap()
+    guess.resolve(price(6_400_100, RESOLVED_AT)).unwrap()
 }
 
 #[test]
