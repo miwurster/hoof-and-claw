@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id,\n                 end_price_cents AS \"end_price_cents!\", end_received_at AS \"end_received_at!\",\n                 end_source AS \"end_source!\", end_trade_id, outcome AS \"outcome!\"\n             FROM guesses WHERE player_id = ? AND state = 'resolved'\n             ORDER BY resolved_at DESC LIMIT 1",
+  "query": "SELECT id, player_id, direction, placed_at, start_price_cents, start_received_at, start_source, start_trade_id,\n                 end_price_cents AS \"end_price_cents!\", end_received_at AS \"end_received_at!\",\n                 end_source AS \"end_source!\", end_trade_id, outcome AS \"outcome!\"\n             FROM guesses WHERE player_id = ? AND state = 'resolved'\n             ORDER BY resolved_at DESC LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -15,8 +15,19 @@
         }
       },
       {
-        "name": "direction",
+        "name": "player_id",
         "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "guesses",
+            "name": "player_id"
+          }
+        }
+      },
+      {
+        "name": "direction",
+        "ordinal": 2,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -27,7 +38,7 @@
       },
       {
         "name": "placed_at",
-        "ordinal": 2,
+        "ordinal": 3,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -38,7 +49,7 @@
       },
       {
         "name": "start_price_cents",
-        "ordinal": 3,
+        "ordinal": 4,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -49,7 +60,7 @@
       },
       {
         "name": "start_received_at",
-        "ordinal": 4,
+        "ordinal": 5,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -60,7 +71,7 @@
       },
       {
         "name": "start_source",
-        "ordinal": 5,
+        "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -71,7 +82,7 @@
       },
       {
         "name": "start_trade_id",
-        "ordinal": 6,
+        "ordinal": 7,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -82,7 +93,7 @@
       },
       {
         "name": "end_price_cents!",
-        "ordinal": 7,
+        "ordinal": 8,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -93,7 +104,7 @@
       },
       {
         "name": "end_received_at!",
-        "ordinal": 8,
+        "ordinal": 9,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -104,7 +115,7 @@
       },
       {
         "name": "end_source!",
-        "ordinal": 9,
+        "ordinal": 10,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -115,7 +126,7 @@
       },
       {
         "name": "end_trade_id",
-        "ordinal": 10,
+        "ordinal": 11,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -126,7 +137,7 @@
       },
       {
         "name": "outcome!",
-        "ordinal": 11,
+        "ordinal": 12,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -146,6 +157,7 @@
       false,
       false,
       false,
+      false,
       true,
       true,
       true,
@@ -154,5 +166,5 @@
       true
     ]
   },
-  "hash": "d0a457fa9b7de5ee07148bce4f2cc90366c0ef41fe5b39eed72fe634a2de77e4"
+  "hash": "b48c4e38c6ff52df76e2d9197fb92727ce6ffc1b75f0fd62e3da7fdcc6ae0618"
 }
