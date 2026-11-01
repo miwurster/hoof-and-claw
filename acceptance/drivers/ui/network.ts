@@ -1,5 +1,6 @@
 // The Player's network: a TCP relay between the browser and the server that the UI driver can cut and restore.
 // Chromium's offline mode leaves an established stream open, so only cutting the connection loses it.
+// A relay of plain TCP cannot carry TLS, so the browser reaches an HTTPS server, the deployed service, directly.
 import { connect, createServer } from "node:net";
 import type { AddressInfo, Server, Socket } from "node:net";
 
@@ -8,13 +9,18 @@ export class Network {
   private up = true;
 
   private constructor(
-    private readonly relay: Server,
+    private readonly relay: Server | undefined,
     readonly baseURL: string,
   ) {}
 
-  /** Opens a relay on a free local port to the server at `target`. */
+  /** Opens a relay on a free local port to the server at `target`, or leads straight to an HTTPS `target`. */
   static async to(target: string): Promise<Network> {
-    const { hostname, port } = new URL(target);
+    const { protocol, hostname, port } = new URL(target);
+
+    if (protocol === "https:") {
+      return new Network(undefined, target);
+    }
+
     let network: Network | undefined;
 
     const relay = createServer((browser) => {
@@ -36,6 +42,10 @@ export class Network {
 
   /** Cuts every open connection, and every new one until `restore`. */
   cut(): void {
+    if (this.relay === undefined) {
+      throw new Error(`the network to ${this.baseURL} runs without a relay, so it cannot be cut`);
+    }
+
     this.up = false;
 
     for (const socket of this.sockets) {
@@ -48,9 +58,16 @@ export class Network {
   }
 
   async close(): Promise<void> {
+    const { relay } = this;
+
+    if (relay === undefined) {
+      return;
+    }
+
     this.cut();
+
     await new Promise<void>((resolve) => {
-      this.relay.close(() => {
+      relay.close(() => {
         resolve();
       });
     });
