@@ -59,10 +59,16 @@ pub struct Snapshot {
     pub last_resolved: Option<ResolvedGuess>,
 }
 
-/// The store could not be read or written, or no random bytes were available for a new ID.
+/// Why the game cannot answer.
 #[derive(Debug, thiserror::Error)]
-#[error("the game cannot reach its store: {0}")]
-pub struct Unavailable(#[source] Box<dyn std::error::Error + Send + Sync>);
+pub enum Unavailable {
+    /// The store could not be read or written.
+    #[error("the game cannot reach its store: {0}")]
+    Store(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// No random bytes were available for a new ID.
+    #[error("the game has no random bytes for a new ID: {0}")]
+    NoRandomBytes(#[source] getrandom::Error),
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum PlaceError {
@@ -74,7 +80,7 @@ pub enum PlaceError {
 
 impl From<identity::StoreError> for Unavailable {
     fn from(error: identity::StoreError) -> Self {
-        Self(Box::new(error))
+        Self::Store(Box::new(error))
     }
 }
 
@@ -82,7 +88,7 @@ impl From<StoreError> for PlaceError {
     fn from(error: StoreError) -> Self {
         match error {
             StoreError::OpenGuessExists => Self::Refused(Refusal::OpenGuessExists),
-            StoreError::Unavailable(error) => Self::Unavailable(Unavailable(error)),
+            StoreError::Unavailable(error) => Self::Unavailable(Unavailable::Store(error)),
         }
     }
 }
@@ -100,7 +106,7 @@ struct Prices {
 /// 10 random bytes for a new ID.
 fn random() -> Result<[u8; 10], Unavailable> {
     let mut bytes = [0; 10];
-    getrandom::fill(&mut bytes).map_err(|error| Unavailable(Box::new(error)))?;
+    getrandom::fill(&mut bytes).map_err(Unavailable::NoRandomBytes)?;
     Ok(bytes)
 }
 
@@ -127,7 +133,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     pub async fn rebuild_due_guesses(&self) -> Result<usize, Unavailable> {
         let open = guessing::Store::open_guesses(&self.store)
             .await
-            .map_err(|error| Unavailable(Box::new(error)))?;
+            .map_err(|error| Unavailable::Store(Box::new(error)))?;
         let count = open.len();
         let mut due = self.due_guesses();
         for guess in open {
@@ -260,7 +266,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         let standing = match player {
             Some(player) => guessing::Store::standing(&self.store, player)
                 .await
-                .map_err(|error| Unavailable(Box::new(error)))?,
+                .map_err(|error| Unavailable::Store(Box::new(error)))?,
             None => guessing::Standing::default(),
         };
         let server_time = self.clock.now();

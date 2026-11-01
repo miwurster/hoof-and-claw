@@ -15,8 +15,10 @@ use crate::TokenHash;
 pub use in_memory::InMemory;
 
 #[derive(Debug, thiserror::Error)]
-#[error("the store is unavailable: {0}")]
-pub struct StoreError(#[source] pub Box<dyn std::error::Error + Send + Sync>);
+pub enum StoreError {
+    #[error("the store is unavailable: {0}")]
+    Unavailable(#[source] Box<dyn std::error::Error + Send + Sync>),
+}
 
 /// Links the hash of a token to the Player it belongs to.
 pub trait Store: Clone + Send + Sync + 'static {
