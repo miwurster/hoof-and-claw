@@ -86,6 +86,10 @@ pub(crate) struct Configuration {
     #[arg(long, env = "MAX_STREAMS_PER_IP", default_value_t = 10)]
     pub(crate) max_streams_per_ip: usize,
 
+    /// How many Player events a stream may hold unread before the server closes it.
+    #[arg(long, env = "PLAYER_EVENT_QUEUE", default_value = "16")]
+    pub(crate) player_event_queue: NonZeroUsize,
+
     /// The directory holding the built app.
     #[arg(long, env = "APP_DIR", default_value = "spa/dist")]
     pub(crate) app_dir: PathBuf,
@@ -116,5 +120,36 @@ impl Configuration {
             backoff_min: Duration::from_secs(self.price_backoff_min_secs),
             backoff_max: Duration::from_secs(self.price_backoff_max_secs),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::Configuration;
+
+    fn parse(arguments: &[&str]) -> Configuration {
+        Configuration::try_parse_from(
+            ["server", "--database-path", "game.db"]
+                .iter()
+                .chain(arguments),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_stream_holds_16_player_events_by_default() {
+        assert_eq!(parse(&[]).player_event_queue.get(), 16);
+    }
+
+    #[test]
+    fn the_queue_of_player_events_is_configurable() {
+        assert_eq!(
+            parse(&["--player-event-queue", "4"])
+                .player_event_queue
+                .get(),
+            4
+        );
     }
 }
