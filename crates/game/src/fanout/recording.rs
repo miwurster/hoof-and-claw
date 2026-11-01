@@ -55,7 +55,7 @@ impl Fanout for Recording {
         self.delivery.notify_player(player, event);
     }
 
-    fn subscribe(&self, player: Option<PlayerId>) -> Subscription {
+    fn subscribe(&self, player: PlayerId) -> Subscription {
         self.delivery.subscribe(player)
     }
 

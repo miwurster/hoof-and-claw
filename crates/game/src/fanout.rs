@@ -46,9 +46,7 @@ pub trait Fanout: Clone + Send + Sync + 'static {
     fn notify_player(&self, player: PlayerId, event: PlayerEvent);
 
     /// Opens the events of one stream, starting after what has been published so far.
-    ///
-    /// A stream of a visitor who is no Player yet gets the prices only.
-    fn subscribe(&self, player: Option<PlayerId>) -> Subscription;
+    fn subscribe(&self, player: PlayerId) -> Subscription;
 
     /// Ends every open stream, and every stream opened afterwards.
     fn close(&self);
@@ -58,7 +56,7 @@ pub trait Fanout: Clone + Send + Sync + 'static {
 /// and a bounded queue of its Player's events, none of which is skipped.
 pub struct Subscription {
     price: watch::Receiver<Delivery>,
-    player: Option<mpsc::Receiver<PlayerEvent>>,
+    player: mpsc::Receiver<PlayerEvent>,
     /// The price this stream has shown: the one it subscribed at, or the last one it was given.
     seen: LatestPrice,
 }
@@ -79,7 +77,7 @@ impl Delivery {
 }
 
 impl Subscription {
-    fn new(price: watch::Receiver<Delivery>, player: Option<mpsc::Receiver<PlayerEvent>>) -> Self {
+    fn new(price: watch::Receiver<Delivery>, player: mpsc::Receiver<PlayerEvent>) -> Self {
         let seen = price.borrow().latest();
         Self {
             price,
@@ -101,18 +99,15 @@ impl Subscription {
                 self.seen = last;
                 return Some(Event::Price(last));
             }
-            let price = match &mut self.player {
-                Some(player) => tokio::select! {
-                    biased;
-                    event = player.recv() => match event {
-                        Some(event) => return Some(Event::Player(event)),
-                        // A closed queue ends the stream, unless the whole fanout closed and the last price is due.
-                        None if matches!(*self.price.borrow(), Delivery::Closed(_)) => continue,
-                        None => return None,
-                    },
-                    changed = self.price.changed() => changed,
+            let price = tokio::select! {
+                biased;
+                event = self.player.recv() => match event {
+                    Some(event) => return Some(Event::Player(event)),
+                    // A closed queue ends the stream, unless the whole fanout closed and the last price is due.
+                    None if matches!(*self.price.borrow(), Delivery::Closed(_)) => continue,
+                    None => return None,
                 },
-                None => self.price.changed().await,
+                changed = self.price.changed() => changed,
             };
             price.ok()?;
             // A closed slot is read at the top of the loop.

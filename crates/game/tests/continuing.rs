@@ -142,7 +142,7 @@ async fn a_game_shutting_down_waits_for_a_running_save_of_resolutions() {
 async fn a_stream_open_while_the_game_shuts_down_gets_price_delayed_before_it_ends() {
     let running = Running::start();
     running.live_at(6_400_000).await;
-    let mut stream = running.game.subscribe(None);
+    let (_, mut stream) = running.game.open_stream(&alice()).await.unwrap();
 
     running.game.shut_down();
     running.game.end_streams();

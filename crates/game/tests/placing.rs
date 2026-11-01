@@ -210,8 +210,7 @@ async fn a_price_still_reaches_a_players_stream() {
         .place_guess(&alice(), Direction::Up)
         .await
         .unwrap();
-    let alice_id = running.game.player(&alice()).await.unwrap();
-    let mut stream = running.game.subscribe(alice_id);
+    let (_, mut stream) = running.game.open_stream(&alice()).await.unwrap();
 
     running.report(Report::Delayed).await;
 

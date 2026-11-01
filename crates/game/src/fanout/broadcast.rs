@@ -75,11 +75,8 @@ impl Fanout for Broadcast {
         }
     }
 
-    fn subscribe(&self, player: Option<PlayerId>) -> Subscription {
+    fn subscribe(&self, player: PlayerId) -> Subscription {
         let price = self.price.subscribe();
-        let Some(player) = player else {
-            return Subscription::new(price, None);
-        };
         let (sender, receiver) = mpsc::channel(self.queue);
         let mut registry = self.registry();
         if !registry.closed {
@@ -90,7 +87,7 @@ impl Fanout for Broadcast {
             });
             registry.streams.entry(player).or_default().push(sender);
         }
-        Subscription::new(price, Some(receiver))
+        Subscription::new(price, receiver)
     }
 
     fn close(&self) {
@@ -144,10 +141,10 @@ mod tests {
         let fanout = Broadcast::default();
         // Each visitor's stream subscribes under its own waiting Player ID, which never gets an event.
         for byte in 0..100 {
-            drop(fanout.subscribe(Some(player(byte))));
+            drop(fanout.subscribe(player(byte)));
         }
 
-        let _open = fanout.subscribe(Some(player(200)));
+        let _open = fanout.subscribe(player(200));
 
         let held: usize = fanout.registry().streams.values().map(Vec::len).sum();
         assert_eq!(held, 1, "only the open stream should be held");
@@ -157,7 +154,7 @@ mod tests {
     async fn a_stream_holds_as_many_player_events_as_the_queue_it_was_given() {
         let fanout = Broadcast::new(NonZeroUsize::new(2).unwrap());
         let alice = player(1);
-        let mut slow = fanout.subscribe(Some(alice));
+        let mut slow = fanout.subscribe(alice);
 
         for byte in 0..3 {
             fanout.notify_player(alice, placed(alice, byte));

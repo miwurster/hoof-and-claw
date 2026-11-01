@@ -290,7 +290,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         token: &Token,
     ) -> Result<(Option<PlayerId>, Subscription), Unavailable> {
         if let Some(player) = self.player(token).await? {
-            return Ok((Some(player), self.fanout.subscribe(Some(player))));
+            return Ok((Some(player), self.fanout.subscribe(player)));
         }
         let fresh = PlayerId::new(self.clock.now(), random()?);
         let waiting = *self.waiting_visitors().entry(token.hash()).or_insert(fresh);
@@ -301,14 +301,9 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
                 visitors.remove(&token.hash());
             }
             drop(visitors);
-            return Ok((Some(player), self.fanout.subscribe(Some(player))));
+            return Ok((Some(player), self.fanout.subscribe(player)));
         }
-        Ok((None, self.fanout.subscribe(Some(waiting))))
-    }
-
-    /// Opens the events of one stream: every price, and the Player's own events.
-    pub fn subscribe(&self, player: Option<PlayerId>) -> Subscription {
-        self.fanout.subscribe(player)
+        Ok((None, self.fanout.subscribe(waiting)))
     }
 
     /// Starts shutting down: publishes Price delayed, which refuses every Guess from now on with `PriceDelayed`, and
