@@ -3,7 +3,8 @@ import { expect } from "@playwright/test";
 import type { APIRequestContext, APIResponse } from "@playwright/test";
 import type { ErrorBody, ErrorCode, OpenGuess, PlaceGuess } from "contract";
 
-import { apply, cents, decode, forgedGuess, FORWARDED_FOR, outcome, shownResult, wire } from "./stream";
+import { apply, decode, FORWARDED_FOR } from "./stream";
+import { cents, forgedGuess, outcome, shownResult, wire } from "./wire";
 import type { View } from "./stream";
 import type { Connection } from "./connection";
 import { expectIdentityCookie, issued, setCookies } from "./identity";
