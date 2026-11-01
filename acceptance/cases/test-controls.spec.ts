@@ -21,8 +21,18 @@ test(
     await clock.advances(seconds(60));
     await server.should.tellTheTime("2027-03-01T08:31:00Z");
 
+    await alice.guesses("Up");
     await store.failsResolutions();
-    await alice.should.beServedTheSnapshot();
+    await clock.advances(seconds(60));
+    await priceSource.sends("64,010.00");
+    await alice.closesTheGame();
+    await alice.opensTheGame();
+    await alice.should.seeThePrice("64,010.00");
+    await alice.should.haveAnOpenGuess("Up", "64,000.00");
+    await alice.should.seeNoResult();
+    await store.recovers();
+    await alice.should.seeTheResult("Correct", "64,000.00", "64,010.00");
+
     await store.goesDown();
     await alice.should.beRefusedTheSnapshot("internal");
     await store.recovers();
