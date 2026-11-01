@@ -42,7 +42,12 @@ One always-on process is the simplest design that meets every rule of the brief,
   Past that, Render bills 0.15 USD per GB.
 - Persistence sits behind a store port whose operations follow the game's access patterns, not SQL.
   They load a Player, place a guess if none is open, and resolve a guess idempotently while adjusting the Score.
-  The SQLite adapter runs in WAL mode with a single writing connection.
+  The SQLite adapter runs in WAL mode with a single writing connection and `synchronous=NORMAL`.
+  With SQLite's default `FULL`, every commit waits for an fsync, and the writes queue behind the one connection.
+  200 Guesses placed at once then took p95 about 270 ms on a Linux runner with 2 CPUs, against the 100 ms budget of ADR 0015; with `NORMAL` they took p95 75 to 83 ms.
+  A committed write survives a crash of the server and every deploy.
+  A crash of the operating system or a power loss can lose the writes since the last checkpoint, though the database stays consistent.
+  For a demo we accept that risk; the scale path replaces SQLite with a managed database anyway.
   Open guesses also live in an in-memory index by due time, rebuilt from the store at start-up, so resolving on a price needs no query.
 - There is no database backup.
   Render snapshots the disk daily, but Render advises against restoring a database from a snapshot, so losing the disk resets every Score to 0.
@@ -72,7 +77,8 @@ The server never stores prices, only the Start and End price of each guess.
 
 The load is neither read- nor write-heavy, just small.
 Reads are keyed lookups of one Player, and resolution reads from memory.
-SQLite in WAL mode handles thousands of writes a second on an SSD, so the store is not the first bottleneck.
+SQLite in WAL mode with `synchronous=NORMAL` handles thousands of writes a second on an SSD, so the store is not the first bottleneck.
+With `FULL`, an fsync on every commit caps it at the disk's fsyncs a second, which on a shared disk can be a few hundred.
 Outbound traffic is the first bottleneck.
 At Render's 0.15 USD per GB, 1,000 viewers around the clock cost about 58 USD a month and 10,000 about 600 USD.
 The Price source does not grow with the number of Players, because the server needs one feed at every scale.
