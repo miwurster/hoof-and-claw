@@ -19,7 +19,7 @@ pub use recording::Recording;
 
 use crate::Open;
 
-/// How many Player events a stream may hold unread before the adapter closes it (ADR 0010).
+/// How many Player events a stream may hold unread before the adapter closes it, unless configured otherwise (ADR 0010).
 pub const PLAYER_EVENT_QUEUE: usize = 16;
 
 /// An event about one Player, for every open stream of that Player.

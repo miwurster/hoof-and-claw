@@ -51,5 +51,5 @@ macro_rules! shared_suite {
     };
 }
 
-shared_suite!(broadcast, Broadcast::new());
+shared_suite!(broadcast, Broadcast::default());
 shared_suite!(recording, Recording::new());

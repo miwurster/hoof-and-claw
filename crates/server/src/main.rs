@@ -31,7 +31,11 @@ async fn main() -> anyhow::Result<()> {
     let result = {
         let clock = test_controls::ControllableClock::new();
         let (source, controls) = test_controls::controllable_source();
-        let game = Game::new(clock.clone(), Broadcast::new(), database.clone());
+        let game = Game::new(
+            clock.clone(),
+            Broadcast::new(configuration.player_event_queue),
+            database.clone(),
+        );
         let close_source = {
             let controls = controls.clone();
             async move { controls.set_connected(false) }
@@ -53,7 +57,11 @@ async fn main() -> anyhow::Result<()> {
     #[cfg(not(feature = "test-controls"))]
     let result = {
         let (source, bitstamp) = bitstamp::Bitstamp::start(configuration.bitstamp())?;
-        let game = Game::new(clock::SystemClock, Broadcast::new(), database.clone());
+        let game = Game::new(
+            clock::SystemClock,
+            Broadcast::new(configuration.player_event_queue),
+            database.clone(),
+        );
         serve(configuration, game, source, bitstamp.close(), None).await
     };
 
