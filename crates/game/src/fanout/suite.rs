@@ -48,8 +48,8 @@ fn placed(player: PlayerId, byte: u8) -> PlayerEvent {
 }
 
 pub async fn every_subscriber_receives_a_published_price(fanout: impl Fanout) {
-    let mut first = fanout.subscribe(None);
-    let mut second = fanout.subscribe(Some(player(1)));
+    let mut first = fanout.subscribe(player(2));
+    let mut second = fanout.subscribe(player(1));
 
     fanout.publish_price(live(6_400_000));
 
@@ -58,7 +58,7 @@ pub async fn every_subscriber_receives_a_published_price(fanout: impl Fanout) {
 }
 
 pub async fn a_subscriber_that_does_not_read_gets_only_the_newest_price(fanout: impl Fanout) {
-    let mut subscription = fanout.subscribe(None);
+    let mut subscription = fanout.subscribe(player(2));
 
     fanout.publish_price(live(6_400_000));
     fanout.publish_price(live(6_400_001));
@@ -77,7 +77,7 @@ pub async fn a_subscriber_gets_nothing_published_before_it_subscribed(fanout: im
 
     fanout.notify_player(player(1), placed(player(1), 10));
 
-    let mut subscription = fanout.subscribe(Some(player(1)));
+    let mut subscription = fanout.subscribe(player(1));
 
     assert!(
         tokio::time::timeout(NOTHING_ARRIVES, subscription.next())
@@ -88,23 +88,23 @@ pub async fn a_subscriber_gets_nothing_published_before_it_subscribed(fanout: im
 }
 
 pub async fn closing_ends_every_subscription(fanout: impl Fanout) {
-    let mut visitors = fanout.subscribe(None);
-    let mut players = fanout.subscribe(Some(player(1)));
+    let mut visitors = fanout.subscribe(player(2));
+    let mut players = fanout.subscribe(player(1));
 
     fanout.close();
 
     assert_eq!(visitors.next().await, None);
     assert_eq!(players.next().await, None);
-    assert_eq!(fanout.subscribe(None).next().await, None);
-    assert_eq!(fanout.subscribe(Some(player(1))).next().await, None);
+    assert_eq!(fanout.subscribe(player(2)).next().await, None);
+    assert_eq!(fanout.subscribe(player(1)).next().await, None);
 }
 
 /// On shutdown the game publishes Price delayed and then closes, so every page shows Price delayed (ADR 0007).
 pub async fn a_price_published_just_before_closing_reaches_every_subscription_before_it_ends(
     fanout: impl Fanout,
 ) {
-    let mut unread = fanout.subscribe(None);
-    let mut read = fanout.subscribe(Some(player(1)));
+    let mut unread = fanout.subscribe(player(2));
+    let mut read = fanout.subscribe(player(1));
     fanout.publish_price(live(6_400_000));
     assert_eq!(read.next().await, Some(price(6_400_000)));
     let mut delayed = live(6_400_000);
@@ -121,10 +121,10 @@ pub async fn a_price_published_just_before_closing_reaches_every_subscription_be
 
 pub async fn a_players_event_reaches_every_stream_of_that_player_and_no_other(fanout: impl Fanout) {
     let alice = player(1);
-    let mut first_tab = fanout.subscribe(Some(alice));
-    let mut second_tab = fanout.subscribe(Some(alice));
-    let mut bobs_tab = fanout.subscribe(Some(player(2)));
-    let mut visitors_tab = fanout.subscribe(None);
+    let mut first_tab = fanout.subscribe(alice);
+    let mut second_tab = fanout.subscribe(alice);
+    let mut bobs_tab = fanout.subscribe(player(2));
+    let mut visitors_tab = fanout.subscribe(player(3));
 
     fanout.notify_player(alice, placed(alice, 10));
 
@@ -148,7 +148,7 @@ pub async fn a_players_event_reaches_every_stream_of_that_player_and_no_other(fa
 
 pub async fn a_player_gets_every_event_in_the_order_it_was_published(fanout: impl Fanout) {
     let alice = player(1);
-    let mut tab = fanout.subscribe(Some(alice));
+    let mut tab = fanout.subscribe(alice);
 
     fanout.notify_player(alice, placed(alice, 10));
     fanout.notify_player(alice, placed(alice, 11));
@@ -159,8 +159,8 @@ pub async fn a_player_gets_every_event_in_the_order_it_was_published(fanout: imp
 
 pub async fn a_stream_whose_queue_of_player_events_is_full_is_closed(fanout: impl Fanout) {
     let alice = player(1);
-    let mut slow = fanout.subscribe(Some(alice));
-    let mut quick = fanout.subscribe(Some(alice));
+    let mut slow = fanout.subscribe(alice);
+    let mut quick = fanout.subscribe(alice);
 
     for byte in 0..=u8::try_from(PLAYER_EVENT_QUEUE).unwrap() {
         fanout.notify_player(alice, placed(alice, byte));

@@ -195,7 +195,7 @@ async fn a_tab_whose_queue_is_full_is_closed_and_its_next_snapshot_holds_every_o
     running.live_at(6_400_000).await;
     running.places(&alice(), Direction::Up).await;
     let alice_id = running.player(&alice()).await;
-    let mut slow_tab = running.game.subscribe(Some(alice_id));
+    let (_, mut slow_tab) = running.game.open_stream(&alice()).await.unwrap();
     let mut cents = 6_400_000;
 
     // Each round is a Guess resolved and the next one placed: two Player events, 18 in all.

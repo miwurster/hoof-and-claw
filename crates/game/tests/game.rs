@@ -209,7 +209,11 @@ async fn the_snapshot_holds_the_latest_price_and_the_servers_time() {
 #[tokio::test(start_paused = true)]
 async fn ending_the_streams_closes_every_subscription() {
     let running = Running::start();
-    let mut subscription = running.game.subscribe(None);
+    let (_, mut subscription) = running
+        .game
+        .open_stream(&identity::Token::from_random_bytes([1; 32]))
+        .await
+        .unwrap();
 
     running.game.end_streams();
 
