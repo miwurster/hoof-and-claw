@@ -8,7 +8,7 @@ use guessing::{
 use identity::{Token, TokenHash};
 use jiff::Timestamp;
 use prices::{LatestPrice, PriceSource, ReceivedPrice, Report, Source};
-use tokio::sync::watch;
+use tokio::sync::{mpsc, watch};
 use tokio::time::Instant;
 
 use crate::{Clock, Fanout, PlayerEvent, Subscription};
@@ -93,6 +93,12 @@ impl From<StoreError> for PlaceError {
     }
 }
 
+/// A report of the Price source with the server's time when it arrived.
+struct Arrival {
+    report: Report,
+    at: Timestamp,
+}
+
 #[derive(Default)]
 struct Prices {
     /// What the Price source reported last.
@@ -144,12 +150,38 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
 
     /// Takes in every report of the Price source until it ends, and publishes the price as it changes.
     ///
+    /// A price gets its receipt time when it arrives, even while the resolutions of an earlier price wait for their
+    /// save, so a price that arrived before a Guess was due never becomes its End price (ADR 0002).
+    ///
     /// A changed price goes out at once after a quiet second; a later change within the same second goes out when the
     /// second ends, with the newest price. A change between live and Price delayed goes out at once.
     /// The throttle runs on `tokio`'s real time, not on the `Clock` (ADR 0011).
     ///
     /// Returns once the game shuts down, after the save of any resolution it is running.
-    pub async fn run(&self, mut source: impl PriceSource) {
+    pub async fn run(&self, source: impl PriceSource) {
+        let (arrived, arrivals) = mpsc::unbounded_channel();
+        tokio::join!(self.take_in(source, arrived), self.handle(arrivals));
+    }
+
+    /// Stamps every report with the time it arrived at, until the source ends or the game shuts down.
+    async fn take_in(&self, mut source: impl PriceSource, arrived: mpsc::UnboundedSender<Arrival>) {
+        let mut shutting_down = self.shutting_down.subscribe();
+        loop {
+            tokio::select! {
+                biased;
+                _ = async { shutting_down.wait_for(|shutting_down| *shutting_down).await.is_ok() } => return,
+                report = source.next() => {
+                    let Some(report) = report else { return };
+                    if arrived.send(Arrival { report, at: self.clock.now() }).is_err() {
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Resolves and publishes every report in the order it arrived.
+    async fn handle(&self, mut arrivals: mpsc::UnboundedReceiver<Arrival>) {
         let mut last_price_sent: Option<Instant> = None;
         let mut pending = false;
         let mut shutting_down = self.shutting_down.subscribe();
@@ -158,15 +190,15 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
             tokio::select! {
                 biased;
                 _ = async { shutting_down.wait_for(|shutting_down| *shutting_down).await.is_ok() } => return,
-                report = source.next() => {
-                    let Some(report) = report else { return };
+                arrival = arrivals.recv() => {
+                    let Some(Arrival { report, at }) = arrival else { return };
                     if let Report::Received(price, trade_id) = report {
                         // The controllable source of the test controls stands in for Bitstamp.
                         let received = ReceivedPrice {
                             price,
                             source: Source::Bitstamp,
                             trade_id,
-                            received_at: self.clock.now(),
+                            received_at: at,
                         };
                         self.lock().last_received = Some(received);
                         self.resolve(received).await;

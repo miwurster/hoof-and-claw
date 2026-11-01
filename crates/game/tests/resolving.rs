@@ -143,6 +143,43 @@ async fn a_resolution_is_published_only_after_its_save_and_a_failed_save_is_retr
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_price_received_while_a_failed_save_is_retried_keeps_the_time_it_arrived_at() {
+    let stores = Stores::default();
+    let running = Running::start_with(&stores);
+    running.live_at(6_400_000).await;
+    running.places(&alice(), Direction::Up).await;
+    running.waits(30);
+    running.places(&bob(), Direction::Up).await;
+    let bob_id = running.player(&bob()).await;
+    stores.failing_resolutions.store(2, Ordering::SeqCst);
+
+    // Alice's Guess resolves, and its save fails; a price arrives 30 s before Bob's Guess is due.
+    running.waits(30);
+    running.receives(6_399_000).await;
+    running.receives(6_401_000).await;
+    // The save is retried until after Bob's Guess is due.
+    running.waits(35);
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    settle().await;
+
+    assert_eq!(
+        running.resolutions(bob_id),
+        [],
+        "a price received before Bob's Guess was due does not resolve it"
+    );
+
+    running.receives(6_402_000).await;
+
+    let resolutions = running.resolutions(bob_id);
+    assert_eq!(resolutions.len(), 1, "{resolutions:?}");
+    assert_eq!(resolutions[0].guess.end.price, Price::from_cents(6_402_000));
+    assert_eq!(
+        resolutions[0].guess.end.received_at,
+        running::NOW + SignedDuration::from_secs(95)
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_open_guess_that_falls_due_while_the_price_is_delayed_resolves_on_the_first_changed_price_after_it_recovers()
  {
     let running = Running::start();
