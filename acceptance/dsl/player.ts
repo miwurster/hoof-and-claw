@@ -215,7 +215,7 @@ function acting(driver: PlayerDriver) {
 /** How the game answers a Player who asks for it: the stream, the snapshot, and the page reconnecting. */
 function connecting(name: string, driver: PlayerDriver) {
   return {
-    /** Is refused the game's stream, with an error code such as "internal". */
+    /** Is refused the game's stream, with an error code such as "rateLimited" or "internal". */
     beRefusedTheGame: async (refusal: Refusal): Promise<void> => {
       const answer = await driver.triesToOpenTheGame();
 
@@ -239,12 +239,6 @@ function connecting(name: string, driver: PlayerDriver) {
     /** Gets the game back once the server answers again, after the page's reconnect backoff. */
     getTheGameBack: async (): Promise<void> => {
       await driver.expectsTheGameBack();
-    },
-    /** Is refused one more tab of the game, with an error code such as "rateLimited". */
-    beRefusedAnotherTab: async (refusal: Refusal): Promise<void> => {
-      const answer = await driver.triesToOpenTheGame();
-
-      expect(answer, `${name} should be refused another tab as ${refusal}, but got ${String(answer)}`).toBe(refusal);
     },
   };
 }

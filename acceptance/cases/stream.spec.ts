@@ -29,7 +29,7 @@ test(
   async ({ alice }) => {
     await alice.opensTheGameInTabs(10);
 
-    await alice.should.beRefusedAnotherTab("rateLimited");
+    await alice.should.beRefusedTheGame("rateLimited");
   },
 );
 
