@@ -21,20 +21,11 @@ pub use command::{AdvanceClock, SendPrice, SetClock, SetConnection};
 pub use price_source::{ControllableSource, SourceControls, controllable_source};
 
 /// What the endpoints drive: the controllable clock and source, and the game they feed.
+#[derive(Clone)]
 pub struct Controls<F, S> {
     pub clock: ControllableClock,
     pub source: SourceControls,
     pub game: Game<ControllableClock, F, S>,
-}
-
-impl<F: Clone, S: Clone> Clone for Controls<F, S> {
-    fn clone(&self) -> Self {
-        Self {
-            clock: self.clock.clone(),
-            source: self.source.clone(),
-            game: self.game.clone(),
-        }
-    }
 }
 
 /// The routes of the test controls, which `web` serves under `/test-controls/`.

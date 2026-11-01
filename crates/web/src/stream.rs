@@ -19,24 +19,13 @@ use crate::event::{PriceChanged, ServerEvent, Snapshot};
 use crate::streams_per_ip::StreamsPerIp;
 
 /// What the game's routes share.
+#[derive(Clone)]
 pub(crate) struct Api<C, F, S> {
     pub(crate) game: Game<C, F, S>,
     pub(crate) build: String,
     pub(crate) keepalive: Duration,
     pub(crate) streams: StreamsPerIp,
     pub(crate) client_ip: ClientIp,
-}
-
-impl<C: Clone, F: Clone, S: Clone> Clone for Api<C, F, S> {
-    fn clone(&self) -> Self {
-        Self {
-            game: self.game.clone(),
-            build: self.build.clone(),
-            keepalive: self.keepalive,
-            streams: self.streams.clone(),
-            client_ip: self.client_ip.clone(),
-        }
-    }
 }
 
 fn internal(error: &Unavailable) -> ErrorCode {
