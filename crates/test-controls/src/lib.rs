@@ -20,7 +20,7 @@ use prices::Price;
 pub use clock::{BeyondTheLastTime, ControllableClock};
 pub use command::{AdvanceClock, SendPrice, SetClock, SetConnection, SetStore, StoreFailure};
 pub use price_source::{ControllableSource, SourceControls, controllable_source};
-pub use store::{ControllableStore, Failed, Failing, StoreControls, controllable_store};
+pub use store::{ControllableStore, Failing, StoreControls, controllable_store};
 
 /// What the endpoints drive: the controllable clock, source and store, and the game they feed.
 #[derive(Clone)]

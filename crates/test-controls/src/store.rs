@@ -32,7 +32,7 @@ pub struct StoreControls {
 /// Why a controllable store failed: its controls make it fail.
 #[derive(Debug, thiserror::Error)]
 #[error("the test controls make the store fail")]
-pub struct Failed;
+struct Failed;
 
 /// A controllable store around `store` and the controls that drive it; it starts failing nothing.
 #[must_use]
