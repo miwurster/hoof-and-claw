@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use jiff::{SignedDuration, Timestamp};
+use jiff::Timestamp;
 use prices::ReceivedPrice;
 
 use crate::{Direction, GuessId, Outcome, PlayerId};
@@ -64,11 +64,11 @@ impl OpenGuess {
         }
     }
 
-    /// When the Guess falls due: 60 seconds after it was placed.
+    /// When the Guess falls due: `GUESS_DURATION` after it was placed.
     #[must_use]
     pub fn due_at(&self) -> Timestamp {
         self.placed_at
-            .saturating_add(SignedDuration::from_secs(60))
+            .saturating_add(GUESS_DURATION)
             .unwrap_or(Timestamp::MAX)
     }
 
@@ -104,6 +104,7 @@ impl OpenGuess {
 
 #[cfg(test)]
 mod tests {
+    use jiff::SignedDuration;
     use prices::{Price, Source};
 
     use super::*;
