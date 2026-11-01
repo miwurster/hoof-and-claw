@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use game::{Event, PlaceError, PlayerEvent};
+use game::{Event, Fanout, PlaceError, PlayerEvent};
 use guessing::{Direction, Refusal, Score};
 use identity::Token;
 use jiff::SignedDuration;
@@ -219,4 +219,40 @@ async fn a_price_still_reaches_a_players_stream() {
         Some(Event::Price(latest)) => assert!(latest.is_delayed()),
         other => panic!("expected a price, got {other:?}"),
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_stream_opened_while_the_first_guess_is_placed_gets_the_players_events() {
+    let stores = support::Stores::default();
+    let running = Running::start_with(&stores);
+    running.live_at(6_400_000).await;
+    let (_, _first_tab) = running.game.open_stream(&alice()).await.unwrap();
+    // The second tab has read that the token is no Player yet when the first Guess links it.
+    let (held, held_now) = tokio::sync::oneshot::channel();
+    let (go_on, going_on) = tokio::sync::oneshot::channel();
+    *stores.held_player_read.lock().unwrap() = Some((held, going_on));
+    let second_tab = tokio::spawn({
+        let game = running.game.clone();
+        async move { game.open_stream(&alice()).await }
+    });
+    held_now.await.unwrap();
+    let open = running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+    go_on.send(()).unwrap();
+    let (player, mut stream) = second_tab.await.unwrap().unwrap();
+
+    let alice_id = open.guess.player;
+    assert_eq!(player, Some(alice_id));
+    running
+        .fanout
+        .notify_player(alice_id, PlayerEvent::GuessPlaced(open));
+    let event = tokio::time::timeout(Duration::from_secs(1), stream.next()).await;
+    assert_eq!(
+        event,
+        Ok(Some(Event::Player(PlayerEvent::GuessPlaced(open)))),
+        "the second tab should get Alice's events"
+    );
 }

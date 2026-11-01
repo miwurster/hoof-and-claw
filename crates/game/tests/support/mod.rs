@@ -1,7 +1,12 @@
 //! What the tests of `game` share.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
+
+use tokio::sync::oneshot;
+
+/// Tells the test that a read is held, and waits for the test to let it go on.
+pub type Hold = (oneshot::Sender<()>, oneshot::Receiver<()>);
 
 /// Both store ports' in-memory fakes behind one value, as `sqlite::Database` holds both.
 #[derive(Clone, Default)]
@@ -10,6 +15,9 @@ pub struct Stores {
     identities: identity::InMemory,
     /// How many of the next saves of resolutions fail, as an unavailable store's would.
     pub failing_resolutions: Arc<AtomicUsize>,
+    /// Holds the next read of a token's Player after it has read: tells the first sender once it is held, and goes on
+    /// when the second receiver gets a value.
+    pub held_player_read: Arc<Mutex<Option<Hold>>>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -53,7 +61,17 @@ impl identity::Store for Stores {
         &self,
         token: identity::TokenHash,
     ) -> Result<Option<guessing::PlayerId>, identity::StoreError> {
-        self.identities.player(token).await
+        let player = self.identities.player(token).await;
+        let held = self
+            .held_player_read
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some((held, go_on)) = held {
+            let _ = held.send(());
+            let _ = go_on.await;
+        }
+        player
     }
 
     async fn link(
