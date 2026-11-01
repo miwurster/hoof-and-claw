@@ -15,6 +15,39 @@ Live at **https://hoof-and-claw.miwurster.com**.
 
 The domain terms (Player, Guess, Start price, End price, Outcome, Price delayed) are defined in `GLOSSARY.md`.
 
+## What the system guarantees
+
+### Fair resolution
+
+Prices come from Bitstamp's public BTC/USD trade feed, a third-party API whose terms allow showing its data to Players.
+Only the server decides prices and time.
+The browser never sends either, and the server stamps each price with the moment it receives it (ADR 0002).
+The Start price is the latest price when the server accepts the Guess.
+The End price is the first received price that differs from the Start price, at least 60 seconds after the Guess.
+The server never backfills a price from history, so no Player can pick a convenient price after the fact.
+While the feed is down, the price shows as "Price delayed" and the server refuses new Guesses, because a Guess must start from a price known to be current.
+A Guess resolves in one conditional `UPDATE` that only touches a Guess that is still open, so a retry can't resolve it twice.
+
+### A durable Score
+
+The server saves every Guess, Outcome and Score in SQLite on a persistent disk before it tells any browser.
+We chose this over an AWS data store on purpose.
+The demo runs on Render to stay within a budget of 10 EUR a month, and an always-on process on AWS costs more ([Why the demo runs on Render](#why-the-demo-runs-on-render)).
+The store sits behind a port with one shared test suite, so moving to RDS for PostgreSQL, or to DynamoDB on serverless hosting, replaces an adapter, not the game ([Where to run it](#where-to-run-it), [Why SQL, and when NoSQL](#why-sql-and-when-nosql)).
+
+### Coming back
+
+A Player is an anonymous random token in an `HttpOnly` cookie that lasts 400 days, so there is no sign-up.
+The Score and any Open guess live on the server, not in the browser.
+A Guess resolves on the server even when no browser is open, and it survives a server restart.
+When the Player returns, the event stream opens with a snapshot of their Score, Open guess and latest Outcome, so every tab shows the same state.
+Clearing cookies or switching browsers starts a new Player at Score 0.
+
+### Testing
+
+Placing, resolving, coming back and a failing store each have acceptance cases that run through the browser and through the HTTP API, with a controllable clock, price source and store.
+The section [Quality without line-by-line review](#quality-without-line-by-line-review) lists every layer.
+
 ## Architecture at a glance
 
 ```mermaid
@@ -89,6 +122,10 @@ flowchart LR
   A Render service with a disk runs exactly one instance, which also means price ingestion and resolution need no coordination.
 - **Abuse protection is per-IP rate limiting only.**
   The server limits how often an IP places Guesses and gets new identity cookies, and allows about ten concurrent streams per IP.
+- **The store can fail.**
+  The server retries a failed save of resolutions after a growing wait of up to 5 seconds, and publishes no Outcome before its save succeeds.
+  On shutdown, the server waits at most 20 seconds (`SHUTDOWN_DRAIN_SECS`) for a running save, then logs that it stopped waiting and exits.
+  A Guess whose resolution was never saved stays open in the store and resolves on the first changed price after the restart, with a later End price.
 
 ## Scaling options
 
@@ -248,7 +285,7 @@ Quality comes from guardrails that run in one Green gate, `mise run gate`, local
 - **Unit and domain tests.** They are written test-first, with property-based tests for the game rules.
 - **An acceptance suite.** It runs on Playwright and TypeScript, in four layers: test cases in domain language, a DSL, protocol drivers, and the system under test.
   Every case runs twice, through the browser UI and through the HTTP API.
-  A controllable clock and price source make 60-second rules testable without waiting:
+  A controllable clock and price source make 60-second rules testable without waiting, and a controllable store fails saves on demand:
 
   ```ts
   await priceSource.sends("64,000.00");
@@ -261,6 +298,8 @@ Quality comes from guardrails that run in one Green gate, `mise run gate`, local
 
 - **A performance layer.** It drives 200 Players against a local server, with budgets for price fan-out, placing a Guess at a steady rate, a burst of Guesses placed at once, a resolution burst, the snapshot and memory.
   It catches regressions; it doesn't prove capacity in production.
+- **Smoke checks against the deployment.** After a Release, they load the page, wait for a price and the stream's snapshot, and check that `/health` reports the released commit.
+  A separate check holds one stream open for two hours.
 - **Architecture tests.** They fail on a forbidden dependency between crates or packages.
 - **Strict linters.** Clippy runs with pedantic lints and forbids `unwrap` and `unsafe`; `cargo-deny`, `cargo-shear` and Oxlint for TypeScript run alongside.
 - **A generated API contract.** `ts-rs` generates the TypeScript types from the Rust wire types, so a mismatch between frontend and server fails the build.
@@ -278,7 +317,8 @@ All tasks run through [mise](https://mise.jdx.dev/), which also pins the tool ve
 | Run the acceptance suite | `pnpm --filter acceptance test` |
 | Run the performance cases | `mise run perf` |
 | Release a green `main` commit | `mise run release [sha]` |
-| Smoke-test the deployed service | `pnpm smoke` |
+| Smoke-test the deployed service | `pnpm --filter acceptance smoke` |
+| Hold one stream to the deployed service for two hours | `pnpm --filter acceptance smoke:hold` |
 
 CI (GitHub Actions) runs only the Green gate, on every push to `main` and every pull request.
 A Release fast-forwards the `release` branch to a `main` commit whose gate passed; Render builds the Docker image from that branch and deploys it.
