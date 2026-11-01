@@ -43,8 +43,11 @@ resource "render_web_service" "hoof_and_claw" {
   }
 
   env_vars = {
-    DATABASE_PATH = { value = "/var/data/hoof-and-claw.db" }
-    LOG_FORMAT    = { value = "json" }
+    # Cloudflare sits in front of Render and overwrites CF-Connecting-IP with the client's address. The rightmost
+    # X-Forwarded-For entry is a proxy hop that changes per connection, so the per-IP limits never matched a client.
+    CLIENT_IP_HEADER = { value = "cf-connecting-ip" }
+    DATABASE_PATH    = { value = "/var/data/hoof-and-claw.db" }
+    LOG_FORMAT       = { value = "json" }
   }
 
   custom_domains = [
