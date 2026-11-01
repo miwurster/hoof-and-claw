@@ -153,3 +153,38 @@ async fn a_stream_open_while_the_game_shuts_down_gets_price_delayed_before_it_en
     assert_eq!(stream.next().await, Some(game::Event::Price(delayed)));
     assert_eq!(stream.next().await, None);
 }
+
+/// What every failure of an unavailable store reads as.
+const STORE_DOWN: &str =
+    "the game cannot reach its store: the store is unavailable: the store is down";
+
+#[tokio::test(start_paused = true)]
+async fn while_the_store_is_down_the_game_reports_it_unavailable() {
+    let stores = Stores::default();
+    let running = Running::start_with(&stores);
+    running.live_at(6_400_000).await;
+    running
+        .game
+        .place_guess(&alice(), Direction::Up)
+        .await
+        .unwrap();
+    let alice_id = running.player(&alice()).await;
+    stores.down.store(true, Ordering::SeqCst);
+
+    let rebuilt = running.game.rebuild_due_guesses().await;
+    let stream = running.game.open_stream(&alice()).await;
+    let snapshot = running.game.snapshot(Some(alice_id)).await;
+    let guess = running
+        .game
+        .place_guess(&Token::from_random_bytes([2; 32]), Direction::Down)
+        .await;
+
+    assert_eq!(rebuilt.unwrap_err().to_string(), STORE_DOWN);
+    assert_eq!(stream.err().unwrap().to_string(), STORE_DOWN);
+    assert_eq!(snapshot.unwrap_err().to_string(), STORE_DOWN);
+    assert!(
+        matches!(&guess, Err(PlaceError::Unavailable(_))),
+        "{guess:?}"
+    );
+    assert_eq!(guess.unwrap_err().to_string(), STORE_DOWN);
+}

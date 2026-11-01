@@ -1,6 +1,6 @@
 //! What the tests of `game` share.
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use tokio::sync::oneshot;
@@ -18,6 +18,24 @@ pub struct Stores {
     /// Holds the next read of a token's Player after it has read: tells the first sender once it is held, and goes on
     /// when the second receiver gets a value.
     pub held_player_read: Arc<Mutex<Option<Hold>>>,
+    /// Whether every read of a Player, a link and every read of Guesses fails, as an unavailable store's would.
+    pub down: Arc<AtomicBool>,
+}
+
+impl Stores {
+    fn guesses_down(&self) -> Result<(), guessing::StoreError> {
+        if self.down.load(Ordering::SeqCst) {
+            return Err(guessing::StoreError::Unavailable(Box::new(Down)));
+        }
+        Ok(())
+    }
+
+    fn identities_down(&self) -> Result<(), identity::StoreError> {
+        if self.down.load(Ordering::SeqCst) {
+            return Err(identity::StoreError::Unavailable(Box::new(Down)));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -45,6 +63,7 @@ impl guessing::Store for Stores {
     }
 
     async fn open_guesses(&self) -> Result<Vec<guessing::OpenGuess>, guessing::StoreError> {
+        self.guesses_down()?;
         self.guesses.open_guesses().await
     }
 
@@ -52,6 +71,7 @@ impl guessing::Store for Stores {
         &self,
         player: guessing::PlayerId,
     ) -> Result<guessing::Standing, guessing::StoreError> {
+        self.guesses_down()?;
         self.guesses.standing(player).await
     }
 }
@@ -61,6 +81,7 @@ impl identity::Store for Stores {
         &self,
         token: identity::TokenHash,
     ) -> Result<Option<guessing::PlayerId>, identity::StoreError> {
+        self.identities_down()?;
         let player = self.identities.player(token).await;
         let held = self
             .held_player_read
@@ -79,6 +100,7 @@ impl identity::Store for Stores {
         token: identity::TokenHash,
         candidate: guessing::PlayerId,
     ) -> Result<guessing::PlayerId, identity::StoreError> {
+        self.identities_down()?;
         self.identities.link(token, candidate).await
     }
 }
