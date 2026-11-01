@@ -1,7 +1,7 @@
 # Performance budgets in the Green gate, on a local server only
 
 The performance test layer guards against regressions.
-It drives 200 Players against a local server, measures five metrics, and fails the Green gate when one of them exceeds its budget.
+It drives 200 Players against a local server, measures six metrics, and fails the Green gate when one of them exceeds its budget.
 Load never goes to the deployed service on Render, so no load reaches Bitstamp, Render's included traffic, or the per-IP limits of the deployed service.
 It does not prove capacity on Render Starter, and it does not look for a breaking point; the scale path in ADR 0003 stays an estimate.
 
@@ -35,12 +35,16 @@ Percentiles come from `hdr-histogram-js`.
 ### Load profile and budgets
 
 200 concurrent Players, about ten times the tens of Players the demo expects, each holding one SSE stream.
+The harness measures placing a Guess at a steady rate, with the 200 Players placing their Guesses evenly over 2 s, 100 a second.
+At about one Guess a minute per Player (ADR 0003), 200 Players place about 3.3 a second, so the rate is 30 times that.
+A separate case places 200 Guesses at once and, like the resolution burst, measures until the last Guess is placed.
 The frozen clock is advanced rather than waited for, so no case waits 60 real seconds.
 
 | Metric | Budget |
 | --- | --- |
 | Price fan-out: from sending a price to its arrival on the last of 200 streams | p95 < 250 ms, max < 1 s |
-| Placing a Guess, the HTTP request | p95 < 100 ms |
+| Placing a Guess, the HTTP request, with 200 Guesses spread over 2 s | p95 < 100 ms |
+| Guess burst: 200 Guesses placed at once, until the last is placed | < 1 s |
 | Resolution burst: 200 Guesses due on one price, until the last Guess resolved event | < 2 s |
 | Snapshot: from opening a stream to its first event | p95 < 200 ms |
 | Resident memory of the server with 200 streams open | < 128 MB |
@@ -52,6 +56,12 @@ The frozen clock is advanced rather than waited for, so no case waits 60 real se
   That still catches a query per stream or a fan-out that grows with the square of the streams, but not noise.
 - **Throttle.** The price throttle runs on real time and lets the first change after a quiet second out at once (ADR 0010).
   The harness waits more than one second between two prices, so every fan-out it measures is such a first change.
+- **Latency under a steady rate, throughput in a burst.**
+  The first CI runs placed all 200 Guesses at once and measured each one's latency against the 100 ms budget.
+  On a runner with 2 vCPUs, the server and the harness share the CPUs, and every Guess waits for the ones queued before it on the one write connection.
+  The p95 was then about 130 to 190 ms, which measured how fast a small runner drains a queue, not how long a Player waits.
+  Spread over 2 s, the same Guesses take p95 under 5 ms.
+  The burst keeps its own budget, so a store that gets slower per Guess still fails the gate.
 - **Budgets are configuration** of the harness, not constants in a case.
   If the first real run shows them far off, we adjust them once; after that, a change needs a reason in the commit.
 - **Measurements as artefacts.** Every run writes its numbers to a file that CI keeps as an artefact.

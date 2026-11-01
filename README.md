@@ -259,7 +259,7 @@ Quality comes from guardrails that run in one Green gate, `mise run gate`, local
   await alice.should.haveScore(1);
   ```
 
-- **A performance layer.** It drives 200 Players against a local server, with budgets for price fan-out, placing a Guess, a resolution burst, the snapshot and memory.
+- **A performance layer.** It drives 200 Players against a local server, with budgets for price fan-out, placing a Guess at a steady rate, a burst of Guesses placed at once, a resolution burst, the snapshot and memory.
   It catches regressions; it doesn't prove capacity in production.
 - **Architecture tests.** They fail on a forbidden dependency between crates or packages.
 - **Strict linters.** Clippy runs with pedantic lints and forbids `unwrap` and `unsafe`; `cargo-deny`, `cargo-shear` and Oxlint for TypeScript run alongside.

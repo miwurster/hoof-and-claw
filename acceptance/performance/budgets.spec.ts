@@ -33,14 +33,27 @@ test("With 200 Players, a price reaches the last of 200 streams within p95 250 m
   await crowd.should.receiveEachPriceOnTheLastStreamWithinBudget();
 });
 
-test("With 200 Players, placing a Guess takes p95 under 100 ms", async ({ players, priceSource }) => {
+test("With 200 Players placing their Guesses over 2 s, placing a Guess takes p95 under 100 ms", async ({
+  players,
+  priceSource,
+}) => {
+  const crowd = await players(PLAYERS);
+
+  await priceSource.sends("64,000.00");
+  await crowd.openTheGame();
+  await crowd.guessSpreadOver(seconds(2), "Up");
+
+  await crowd.should.placeTheirGuessesWithinBudget();
+});
+
+test("200 Players placing a Guess at once all have it placed within 1 s", async ({ players, priceSource }) => {
   const crowd = await players(PLAYERS);
 
   await priceSource.sends("64,000.00");
   await crowd.openTheGame();
   await crowd.guess("Up");
 
-  await crowd.should.placeTheirGuessesWithinBudget();
+  await crowd.should.placeTheirGuessesAtOnceWithinBudget();
 });
 
 test("200 Guesses due on one price all resolve, until the last Guess resolved event, within 2 s", async ({

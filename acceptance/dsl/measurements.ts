@@ -5,8 +5,9 @@ import type { TestInfo } from "@playwright/test";
 import { build } from "hdr-histogram-js";
 import type { Histogram } from "hdr-histogram-js";
 
-/** The five metrics of ADR 0015. */
-export type Metric = "priceFanOut" | "placingAGuess" | "resolutionBurst" | "firstEvent" | "residentMemory";
+/** The six metrics of ADR 0015. */
+export type Metric =
+  "priceFanOut" | "placingAGuess" | "guessBurst" | "resolutionBurst" | "firstEvent" | "residentMemory";
 
 /** The most a metric may reach: its 95th percentile, its maximum, or both. */
 export type Budget = { readonly p95?: number; readonly max?: number };
@@ -18,6 +19,7 @@ export type Budgets = Readonly<Record<Metric, Budget>>;
 const UNIT = {
   priceFanOut: "ms",
   placingAGuess: "ms",
+  guessBurst: "ms",
   resolutionBurst: "ms",
   firstEvent: "ms",
   residentMemory: "MB",
@@ -27,6 +29,7 @@ const UNIT = {
 const NAME = {
   priceFanOut: "the time from sending a price to its arrival on the last stream",
   placingAGuess: "the time to place a Guess",
+  guessBurst: "the time from every Player placing a Guess at once to the last Guess placed",
   resolutionBurst: "the time from the price that makes every Guess due to the last Guess resolved event",
   firstEvent: "the time from opening a stream to its first event",
   residentMemory: "the server's resident memory",

@@ -3,6 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { expect } from "@playwright/test";
 
+import type { Span } from "./clock";
 import type { Direction, MeasuredPlayerDriver } from "./drivers";
 import type { Measurements, Metric } from "./measurements";
 import type { PriceSource } from "./price-source";
@@ -52,6 +53,9 @@ export class Players {
       placeTheirGuessesWithinBudget: async (): Promise<void> => {
         await this.withinBudget("placingAGuess");
       },
+      placeTheirGuessesAtOnceWithinBudget: async (): Promise<void> => {
+        await this.withinBudget("guessBurst");
+      },
       seeEveryGuessResolvedWithinBudget: async (): Promise<void> => {
         await this.withinBudget("resolutionBurst");
       },
@@ -81,9 +85,25 @@ export class Players {
     }
   }
 
-  /** Every Player places a Guess at once; measures each Guess placed. */
+  /** Every Player places a Guess at once; measures until the last Guess is placed. */
   async guess(direction: Direction): Promise<void> {
     const durations = await this.step((driver) => driver.guesses(direction), `guess ${direction}`);
+
+    this.measurements.record("guessBurst", Math.max(...durations));
+  }
+
+  /** The Players place a Guess one after another, evenly spread over the span; measures each Guess placed. */
+  async guessSpreadOver(span: Span, direction: Direction): Promise<void> {
+    const gap = span.milliseconds / this.drivers.length;
+
+    const durations = await this.step(
+      async (driver) => {
+        await sleep(gap * this.drivers.indexOf(driver));
+
+        return driver.guesses(direction);
+      },
+      `guess ${direction} spread over ${String(span.milliseconds)} ms`,
+    );
 
     for (const duration of durations) {
       this.measurements.record("placingAGuess", duration);

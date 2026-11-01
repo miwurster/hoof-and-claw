@@ -72,6 +72,7 @@ export const test = base.extend<Actors & Infrastructure & Options, Worker>({
       budgets: {
         priceFanOut: {},
         placingAGuess: {},
+        guessBurst: {},
         resolutionBurst: {},
         firstEvent: {},
         residentMemory: {},

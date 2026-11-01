@@ -56,5 +56,7 @@ ADR 0014 fixes the routes, payloads and status codes.
 - A price in a test case is a dollar string such as `"64,000.00"`; the drivers convert it to cents.
 - The UI driver finds an element by its role and accessible name, and uses `data-testid` only where no role fits.
 - A test waits for an expected state with a timeout (`expect`, `expect.poll`), never for a fixed time.
-  The one exception is the performance cases, which wait a little more than the price throttle's second before each measured price, so they measure only the first change after a quiet second (ADR 0010, ADR 0015).
+  The one exception is the performance cases.
+  They wait a little more than the price throttle's second before each measured price, so they measure only the first change after a quiet second (ADR 0010, ADR 0015).
+  They also spread the Players' Guesses evenly over a fixed span, so they measure placing a Guess at a steady rate (ADR 0015).
 - A DSL assertion's failure message uses glossary terms, such as "Alice should have Score 1, but has 0".

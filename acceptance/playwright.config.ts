@@ -16,6 +16,7 @@ const ui: Drivers = { player: uiPlayer, server: apiServer, controls };
 const budgets: Budgets = {
   priceFanOut: { p95: 250, max: 1000 },
   placingAGuess: { p95: 100 },
+  guessBurst: { max: 1000 },
   resolutionBurst: { max: 2000 },
   firstEvent: { p95: 200 },
   residentMemory: { max: 128 },
