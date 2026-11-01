@@ -39,29 +39,26 @@ pub enum Refusal {
 }
 
 impl OpenGuess {
-    /// Places a Guess at `now` from the last price received, which needs a live price (ADR 0007).
+    /// Places a Guess at `now` from the live price, the last price received while the price is not delayed (ADR 0007).
     ///
     /// # Errors
     ///
-    /// Refuses with `PriceDelayed` while the price is delayed or before any price was received.
+    /// Refuses with `PriceDelayed` without a live price: while the price is delayed or before any price was received.
     pub fn place(
         id: GuessId,
         player: PlayerId,
         direction: Direction,
-        last_received: Option<ReceivedPrice>,
-        delayed: bool,
+        live: Option<ReceivedPrice>,
         now: Timestamp,
     ) -> Result<Self, Refusal> {
-        match last_received {
-            Some(start) if !delayed => Ok(Self {
-                id,
-                player,
-                direction,
-                start,
-                placed_at: now,
-            }),
-            _ => Err(Refusal::PriceDelayed),
-        }
+        let start = live.ok_or(Refusal::PriceDelayed)?;
+        Ok(Self {
+            id,
+            player,
+            direction,
+            start,
+            placed_at: now,
+        })
     }
 
     /// When the Guess falls due: `GUESS_DURATION` after it was placed.
@@ -120,20 +117,19 @@ mod tests {
         }
     }
 
-    fn place(last: Option<ReceivedPrice>, delayed: bool) -> Result<OpenGuess, Refusal> {
+    fn place(live: Option<ReceivedPrice>) -> Result<OpenGuess, Refusal> {
         OpenGuess::place(
             GuessId::new(NOW, [1; 10]),
             PlayerId::new(NOW, [2; 10]),
             Direction::Up,
-            last,
-            delayed,
+            live,
             NOW,
         )
     }
 
     #[test]
     fn a_guess_starts_from_the_last_price_received() {
-        let guess = place(Some(received(6_400_050)), false).unwrap();
+        let guess = place(Some(received(6_400_050))).unwrap();
 
         assert_eq!(guess.start, received(6_400_050));
         assert_eq!(guess.direction, Direction::Up);
@@ -141,28 +137,20 @@ mod tests {
     }
 
     #[test]
-    fn while_the_price_is_delayed_a_guess_is_refused() {
-        assert_eq!(
-            place(Some(received(6_400_000)), true),
-            Err(Refusal::PriceDelayed)
-        );
-    }
-
-    #[test]
-    fn before_any_price_a_guess_is_refused() {
-        assert_eq!(place(None, false), Err(Refusal::PriceDelayed));
+    fn without_a_live_price_a_guess_is_refused() {
+        assert_eq!(place(None), Err(Refusal::PriceDelayed));
     }
 
     #[test]
     fn a_guess_has_60_seconds_left_when_it_is_placed() {
-        let guess = place(Some(received(6_400_000)), false).unwrap();
+        let guess = place(Some(received(6_400_000))).unwrap();
 
         assert_eq!(guess.remaining(NOW), Duration::from_secs(60));
     }
 
     #[test]
     fn the_time_left_counts_down_with_the_servers_clock() {
-        let guess = place(Some(received(6_400_000)), false).unwrap();
+        let guess = place(Some(received(6_400_000))).unwrap();
         let later = NOW
             .checked_add(SignedDuration::from_millis(20_250))
             .unwrap();
@@ -185,7 +173,6 @@ mod tests {
             PlayerId::new(NOW, [2; 10]),
             direction,
             Some(received(6_400_000)),
-            false,
             NOW,
         )
         .unwrap()
@@ -267,7 +254,7 @@ mod tests {
 
     #[test]
     fn a_due_guess_has_no_time_left() {
-        let guess = place(Some(received(6_400_000)), false).unwrap();
+        let guess = place(Some(received(6_400_000))).unwrap();
         let due = NOW.checked_add(SignedDuration::from_secs(60)).unwrap();
         let past = NOW.checked_add(SignedDuration::from_secs(90)).unwrap();
 

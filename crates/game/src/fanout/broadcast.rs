@@ -3,7 +3,7 @@ use std::num::NonZeroUsize;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use guessing::PlayerId;
-use prices::LatestPrice;
+use prices::ShownPrice;
 use tokio::sync::{mpsc, watch};
 
 use super::{Delivery, Fanout, PLAYER_EVENT_QUEUE, PlayerEvent, Subscription};
@@ -32,7 +32,7 @@ impl Broadcast {
     }
 
     fn holding(queue: usize) -> Self {
-        let (price, _) = watch::channel(Delivery::Price(LatestPrice::default()));
+        let (price, _) = watch::channel(Delivery::Price(ShownPrice::default()));
         Self {
             price: Arc::new(price),
             players: Arc::default(),
@@ -53,7 +53,7 @@ impl Default for Broadcast {
 }
 
 impl Fanout for Broadcast {
-    fn publish_price(&self, latest: LatestPrice) {
+    fn publish_price(&self, latest: ShownPrice) {
         self.price.send_if_modified(|delivery| {
             if matches!(delivery, Delivery::Closed(_)) {
                 return false;

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use game::{Clock, Game, Recording};
 use jiff::Timestamp;
-use prices::{LatestPrice, Price, PriceSource, Report, Source};
+use prices::{Price, PriceSource, Report, ShownPrice, Source, TradeId};
 use support::Stores;
 use tokio::sync::mpsc;
 
@@ -95,17 +95,8 @@ fn price(cents: u64) -> Price {
     Price::from_cents(cents)
 }
 
-fn latest(cents: Option<u64>, delayed: bool) -> LatestPrice {
-    let mut latest = LatestPrice::default();
-    latest.apply(if delayed {
-        Report::Delayed
-    } else {
-        Report::Live
-    });
-    if let Some(cents) = cents {
-        latest.apply(Report::Received(price(cents), None));
-    }
-    latest
+fn latest(cents: Option<u64>, delayed: bool) -> ShownPrice {
+    ShownPrice::new(cents.map(price), delayed)
 }
 
 #[tokio::test(start_paused = true)]
@@ -158,6 +149,28 @@ async fn a_second_change_within_one_second_arrives_when_the_second_ends_with_the
 }
 
 #[tokio::test(start_paused = true)]
+async fn two_trades_at_the_same_new_price_within_one_second_publish_it_once() {
+    let running = Running::start();
+    running.live_at(6_400_000).await;
+
+    wait(Duration::from_millis(200)).await;
+    running
+        .report(Report::Received(price(6_400_001), Some(TradeId::new(1))))
+        .await;
+    wait(Duration::from_millis(300)).await;
+    running
+        .report(Report::Received(price(6_400_001), Some(TradeId::new(2))))
+        .await;
+    wait(Duration::from_secs(2)).await;
+    running
+        .report(Report::Received(price(6_400_001), Some(TradeId::new(3))))
+        .await;
+    wait(Duration::from_secs(2)).await;
+
+    assert_eq!(running.published_prices(), [6_400_000, 6_400_001]);
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_price_stream_carries_at_most_one_price_a_second() {
     let running = Running::start();
     running.live_at(6_400_000).await;
@@ -202,7 +215,7 @@ async fn the_snapshot_holds_the_latest_price_and_the_servers_time() {
     running.live_at(6_400_000).await;
     let live = running.game.snapshot(None).await.unwrap();
 
-    assert_eq!(at_start.latest, LatestPrice::default());
+    assert_eq!(at_start.latest, ShownPrice::default());
     assert_eq!(live.latest, latest(Some(6_400_000), false));
     assert_eq!(
         live.server_time,
@@ -241,7 +254,7 @@ async fn forgetting_the_price_returns_to_the_start_state_and_publishes_it() {
     assert_eq!(
         running.fanout.published()[2..],
         [
-            LatestPrice::default(),
+            ShownPrice::default(),
             latest(None, false),
             latest(Some(6_400_000), false)
         ]

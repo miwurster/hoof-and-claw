@@ -7,7 +7,7 @@ use guessing::{
 };
 use identity::{Token, TokenHash};
 use jiff::Timestamp;
-use prices::{LatestPrice, PriceSource, ReceivedPrice, Report, Source};
+use prices::{LatestPrice, PriceSource, ReceivedPrice, Report, ShownPrice, Source};
 use tokio::sync::{mpsc, watch};
 use tokio::time::Instant;
 
@@ -52,7 +52,7 @@ pub struct Open {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Snapshot {
     pub server_time: Timestamp,
-    pub latest: LatestPrice,
+    pub latest: ShownPrice,
     pub score: Score,
     pub open_guess: Option<Open>,
     /// The Player's most recent Resolved guess, which the page shows until the next Guess.
@@ -101,12 +101,10 @@ struct Arrival {
 
 #[derive(Default)]
 struct Prices {
-    /// What the Price source reported last.
+    /// What the Price source reported last; its live price is the Start price of a Guess placed now.
     latest: LatestPrice,
-    /// The last price received, with when the server received it: the Start price of a Guess placed now.
-    last_received: Option<ReceivedPrice>,
     /// What the streams were sent last.
-    published: LatestPrice,
+    published: ShownPrice,
 }
 
 /// 10 random bytes for a new ID.
@@ -193,21 +191,25 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
                 _ = async { shutting_down.wait_for(|shutting_down| *shutting_down).await.is_ok() } => return,
                 arrival = arrivals.recv() => {
                     let Some(Arrival { report, at }) = arrival else { return };
-                    if let Report::Received(price, trade_id) = report {
-                        let received = ReceivedPrice {
-                            price,
-                            source: from,
-                            trade_id,
-                            received_at: at,
-                        };
-                        self.lock().last_received = Some(received);
-                        self.resolve(received).await;
+                    match report {
+                        Report::Received(price, trade_id) => {
+                            let received = ReceivedPrice {
+                                price,
+                                source: from,
+                                trade_id,
+                                received_at: at,
+                            };
+                            self.lock().latest.receive(received);
+                            self.resolve(received).await;
+                        }
+                        Report::Live => self.lock().latest.set_delayed(false),
+                        Report::Delayed => self.lock().latest.set_delayed(true),
                     }
                     let mut prices = self.lock();
-                    prices.latest.apply(report);
-                    if prices.latest.is_delayed() != prices.published.is_delayed() {
+                    let shown = prices.latest.shown();
+                    if shown.is_delayed() != prices.published.is_delayed() {
                         self.publish(&mut prices);
-                    } else if prices.latest.price() != prices.published.price() {
+                    } else if shown != prices.published {
                         if Instant::now() >= due {
                             self.publish(&mut prices);
                             last_price_sent = Some(Instant::now());
@@ -219,7 +221,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
                 () = tokio::time::sleep_until(due), if pending => {
                     pending = false;
                     let mut prices = self.lock();
-                    if prices.latest != prices.published {
+                    if prices.latest.shown() != prices.published {
                         self.publish(&mut prices);
                         last_price_sent = Some(Instant::now());
                     }
@@ -240,24 +242,15 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         token: &Token,
         direction: Direction,
     ) -> Result<Open, PlaceError> {
-        let (last_received, delayed) = {
-            let prices = self.lock();
-            (prices.last_received, prices.latest.is_delayed())
-        };
+        let live = self.lock().latest.live();
         let now = self.clock.now();
         let fresh = PlayerId::new(now, random()?);
         // A stream opened meanwhile subscribes as the same Player.
         let player = *self.waiting_visitors().entry(token.hash()).or_insert(fresh);
         // The price is checked before anything is written, so a refused Guess stores no Player.
-        let candidate = OpenGuess::place(
-            GuessId::new(now, random()?),
-            player,
-            direction,
-            last_received,
-            delayed,
-            now,
-        )
-        .map_err(PlaceError::Refused)?;
+        let candidate =
+            OpenGuess::place(GuessId::new(now, random()?), player, direction, live, now)
+                .map_err(PlaceError::Refused)?;
         let player = identity::Store::link(&self.store, token.hash(), candidate.player)
             .await
             .map_err(Unavailable::from)?;
@@ -304,7 +297,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
         let server_time = self.clock.now();
         Ok(Snapshot {
             server_time,
-            latest: self.lock().latest,
+            latest: self.lock().latest.shown(),
             score: standing.score,
             open_guess: standing.open_guess.map(|guess| Open {
                 guess,
@@ -349,7 +342,7 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     pub fn shut_down(&self) {
         self.shutting_down.send_replace(true);
         let mut prices = self.lock();
-        prices.latest.apply(Report::Delayed);
+        prices.latest.set_delayed(true);
         self.publish(&mut prices);
     }
 
@@ -363,7 +356,6 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     pub fn forget_the_price(&self) {
         let mut prices = self.lock();
         prices.latest = LatestPrice::default();
-        prices.last_received = None;
         self.publish(&mut prices);
     }
 
@@ -409,8 +401,8 @@ impl<C: Clock, F: Fanout, S: Store> Game<C, F, S> {
     }
 
     fn publish(&self, prices: &mut Prices) {
-        prices.published = prices.latest;
-        self.fanout.publish_price(prices.latest);
+        prices.published = prices.latest.shown();
+        self.fanout.publish_price(prices.published);
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Prices> {

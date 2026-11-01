@@ -147,9 +147,8 @@ async fn a_stream_open_while_the_game_shuts_down_gets_price_delayed_before_it_en
     running.game.shut_down();
     running.game.end_streams();
 
-    let mut delayed = running.fanout.published().last().copied().unwrap();
+    let delayed = running.fanout.published().last().copied().unwrap();
     assert!(delayed.is_delayed());
-    delayed.apply(prices::Report::Delayed);
     assert_eq!(stream.next().await, Some(game::Event::Price(delayed)));
     assert_eq!(stream.next().await, None);
 }

@@ -105,8 +105,8 @@ pub enum Outcome {
     Wrong,
 }
 
-impl From<prices::LatestPrice> for PriceChanged {
-    fn from(latest: prices::LatestPrice) -> Self {
+impl From<prices::ShownPrice> for PriceChanged {
+    fn from(latest: prices::ShownPrice) -> Self {
         Self {
             price: latest.price().map(prices::Price::cents),
             delayed: latest.is_delayed(),

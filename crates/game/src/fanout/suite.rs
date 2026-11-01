@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use guessing::{Direction, GuessId, OpenGuess, PlayerId};
 use jiff::Timestamp;
-use prices::{LatestPrice, Price, ReceivedPrice, Report, Source};
+use prices::{Price, ReceivedPrice, ShownPrice, Source};
 
 use super::{Event, Fanout, PLAYER_EVENT_QUEUE, PlayerEvent};
 use crate::Open;
@@ -14,11 +14,8 @@ const NOTHING_ARRIVES: Duration = Duration::from_millis(50);
 
 const AT: Timestamp = Timestamp::constant(1_798_761_600, 0);
 
-fn live(cents: u64) -> LatestPrice {
-    let mut latest = LatestPrice::default();
-    latest.apply(Report::Live);
-    latest.apply(Report::Received(Price::from_cents(cents), None));
-    latest
+const fn live(cents: u64) -> ShownPrice {
+    ShownPrice::new(Some(Price::from_cents(cents)), false)
 }
 
 fn price(cents: u64) -> Event {
@@ -107,8 +104,7 @@ pub async fn a_price_published_just_before_closing_reaches_every_subscription_be
     let mut read = fanout.subscribe(player(1));
     fanout.publish_price(live(6_400_000));
     assert_eq!(read.next().await, Some(price(6_400_000)));
-    let mut delayed = live(6_400_000);
-    delayed.apply(Report::Delayed);
+    let delayed = ShownPrice::new(Some(Price::from_cents(6_400_000)), true);
 
     fanout.publish_price(delayed);
     fanout.close();

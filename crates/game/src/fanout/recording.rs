@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use guessing::PlayerId;
-use prices::LatestPrice;
+use prices::ShownPrice;
 
 use super::{Broadcast, Fanout, PlayerEvent, Subscription};
 
@@ -9,7 +9,7 @@ use super::{Broadcast, Fanout, PlayerEvent, Subscription};
 #[derive(Clone, Default)]
 pub struct Recording {
     delivery: Broadcast,
-    published: Arc<Mutex<Vec<LatestPrice>>>,
+    published: Arc<Mutex<Vec<ShownPrice>>>,
     notified: Arc<Mutex<Vec<(PlayerId, PlayerEvent)>>>,
 }
 
@@ -21,7 +21,7 @@ impl Recording {
 
     /// Every price published so far, oldest first.
     #[must_use]
-    pub fn published(&self) -> Vec<LatestPrice> {
+    pub fn published(&self) -> Vec<ShownPrice> {
         self.published
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -39,7 +39,7 @@ impl Recording {
 }
 
 impl Fanout for Recording {
-    fn publish_price(&self, latest: LatestPrice) {
+    fn publish_price(&self, latest: ShownPrice) {
         self.published
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

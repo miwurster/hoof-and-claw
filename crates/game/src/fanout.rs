@@ -11,7 +11,7 @@ mod recording;
 pub mod suite;
 
 use guessing::{PlayerId, Resolution};
-use prices::LatestPrice;
+use prices::ShownPrice;
 use tokio::sync::{mpsc, watch};
 
 pub use broadcast::Broadcast;
@@ -33,14 +33,14 @@ pub enum PlayerEvent {
 /// What one stream receives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Event {
-    Price(LatestPrice),
+    Price(ShownPrice),
     Player(PlayerEvent),
 }
 
 /// Publishes events to the open streams.
 pub trait Fanout: Clone + Send + Sync + 'static {
     /// Sends the latest price, or a change between live and Price delayed, to every open stream.
-    fn publish_price(&self, latest: LatestPrice);
+    fn publish_price(&self, latest: ShownPrice);
 
     /// Sends an event to every open stream of one Player; a stream whose queue is full is closed instead.
     fn notify_player(&self, player: PlayerId, event: PlayerEvent);
@@ -58,18 +58,18 @@ pub struct Subscription {
     price: watch::Receiver<Delivery>,
     player: mpsc::Receiver<PlayerEvent>,
     /// The price this stream has shown: the one it subscribed at, or the last one it was given.
-    seen: LatestPrice,
+    seen: ShownPrice,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Delivery {
-    Price(LatestPrice),
+    Price(ShownPrice),
     /// Closed, with the last price published before, which a stream that has not shown it gets before it ends.
-    Closed(LatestPrice),
+    Closed(ShownPrice),
 }
 
 impl Delivery {
-    const fn latest(self) -> LatestPrice {
+    const fn latest(self) -> ShownPrice {
         match self {
             Self::Price(latest) | Self::Closed(latest) => latest,
         }
