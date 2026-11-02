@@ -26,8 +26,9 @@ pub(crate) struct Api<C, F, S> {
     pub(crate) client_ip: ClientIp,
 }
 
+/// The game could not read what the route needs; the error names what.
 fn internal(error: &Unavailable) -> ErrorCode {
-    tracing::error!("cannot read a Player: {error}");
+    tracing::error!("{error}");
     ErrorCode::Internal
 }
 
@@ -70,7 +71,7 @@ pub(crate) async fn snapshot<C: Clock, F: Fanout, S: Store>(
 /// One stream per tab: the snapshot first, then every published price and the Player's events, with the named event
 /// `keepalive` in between (ADR 0010).
 ///
-/// An IP that already holds `MAX_STREAMS_PER_IP` open streams is refused with `rateLimited`.
+/// An IP that already holds `Limits::streams_per_ip` open streams is refused with `rateLimited`.
 pub(crate) async fn events<C: Clock, F: Fanout, S: Store>(
     State(api): State<Api<C, F, S>>,
     Extension(token): Extension<Token>,
