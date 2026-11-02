@@ -16,7 +16,9 @@ It sets `RENDER_GIT_COMMIT` to `git rev-parse HEAD`, so the instance reports the
 - **Two instances side by side:** give each its own `PORT` and `DATABASE_PATH`; `PORT=0` picks a free port, read from the log line.
   The acceptance suite's worker fixture starts its servers the same way.
 - **Teardown:** stop the process by its PID, then delete the database file.
-- **Start state:** the price is Price delayed and there is no price until a test control sends one.
+- **Start state:** the Price source is disconnected, so the price is Price delayed and there is no price.
+  A sent price alone does not lift Price delayed: restore the connection first, `POST /test-controls/connection` with `{"connected": true}`, then send the price.
+  The acceptance DSL's `priceSource.sends` does both.
 
 ## Doctor
 
