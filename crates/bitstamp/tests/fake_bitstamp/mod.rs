@@ -140,7 +140,7 @@ impl FakeBitstamp {
         self.to_subscribed(&json!({ "event": "bts:request_reconnect", "channel": "", "data": "" }));
     }
 
-    /// Drops every open connection without a close frame's courtesy beyond the WebSocket close.
+    /// Closes every open connection from Bitstamp's side with a plain close frame, as an unplanned disconnect does.
     pub fn drops_connections(&self) {
         for connection in &self.lock().connections {
             let _ = connection.outgoing.send(Outgoing::Close);

@@ -4,21 +4,13 @@ use std::time::Duration;
 
 use game::{Event, Fanout, PlaceError, PlayerEvent};
 use guessing::{Direction, Refusal, Score};
-use identity::Token;
 use jiff::SignedDuration;
 use prices::{Price, ReceivedPrice, Report, Source};
-use running::{NOW, Running};
+use running::{NOW, Running, alice, bob};
 
+#[expect(dead_code, reason = "this binary takes only some of the steps")]
 mod running;
 mod support;
-
-fn alice() -> Token {
-    Token::from_random_bytes([1; 32])
-}
-
-fn bob() -> Token {
-    Token::from_random_bytes([2; 32])
-}
 
 #[tokio::test(start_paused = true)]
 async fn a_guess_starts_from_the_last_price_received_with_60_seconds_left() {

@@ -1,102 +1,22 @@
-//! The running game with a fake Price source, a fixed clock and the recording `Fanout`.
+//! The running game with a fake Price source, a clock that stands still and the recording `Fanout`.
 
 use std::time::Duration;
 
-use game::{Clock, Game, Recording};
 use jiff::Timestamp;
-use prices::{Price, PriceSource, Report, ShownPrice, Source, TradeId};
-use support::Stores;
-use tokio::sync::mpsc;
+use prices::{Price, Report, ShownPrice, TradeId};
+use running::{Running, settle};
 
+#[expect(dead_code, reason = "this binary takes only some of the steps")]
+mod running;
 mod support;
-
-/// 2026-10-31T12:00:00Z.
-const NOW: Timestamp = Timestamp::constant(1_793_448_000, 0);
-
-#[derive(Clone)]
-struct FixedClock(Timestamp);
-
-impl Clock for FixedClock {
-    fn now(&self) -> Timestamp {
-        self.0
-    }
-}
-
-struct FakeSource(mpsc::UnboundedReceiver<Report>);
-
-impl PriceSource for FakeSource {
-    fn source(&self) -> Source {
-        Source::Bitstamp
-    }
-
-    async fn next(&mut self) -> Option<Report> {
-        self.0.recv().await
-    }
-}
-
-struct Running {
-    game: Game<FixedClock, Recording, Stores>,
-    fanout: Recording,
-    reports: mpsc::UnboundedSender<Report>,
-}
-
-impl Running {
-    fn start() -> Self {
-        let fanout = Recording::new();
-        let game = Game::new(FixedClock(NOW), fanout.clone(), Stores::default());
-        let (reports, receiver) = mpsc::unbounded_channel();
-        tokio::spawn({
-            let game = game.clone();
-            async move { game.run(FakeSource(receiver)).await }
-        });
-        Self {
-            game,
-            fanout,
-            reports,
-        }
-    }
-
-    async fn report(&self, report: Report) {
-        assert!(
-            self.reports.send(report).is_ok(),
-            "the game should still take reports"
-        );
-        settle().await;
-    }
-
-    async fn live_at(&self, cents: u64) {
-        self.report(Report::Live).await;
-        self.report(Report::Received(price(cents), None)).await;
-    }
-
-    fn published_prices(&self) -> Vec<u64> {
-        self.fanout
-            .published()
-            .iter()
-            .filter(|latest| !latest.is_delayed())
-            .filter_map(|latest| latest.price().map(Price::cents))
-            .collect()
-    }
-}
-
-/// Lets the game's task take in everything sent so far.
-async fn settle() {
-    for _ in 0..10 {
-        tokio::task::yield_now().await;
-    }
-}
 
 async fn wait(duration: Duration) {
     tokio::time::sleep(duration).await;
     settle().await;
 }
 
-fn price(cents: u64) -> Price {
-    Price::from_cents(cents)
-}
-
 fn latest(cents: Option<u64>, delayed: bool) -> ShownPrice {
-    ShownPrice::new(cents.map(price), delayed)
+    ShownPrice::new(cents.map(Price::from_cents), delayed)
 }
 
 #[tokio::test(start_paused = true)]
@@ -114,9 +34,7 @@ async fn a_price_equal_to_the_last_one_published_is_not_published() {
     running.live_at(6_400_000).await;
     wait(Duration::from_secs(2)).await;
 
-    running
-        .report(Report::Received(price(6_400_000), None))
-        .await;
+    running.receives(6_400_000).await;
     wait(Duration::from_secs(2)).await;
 
     assert_eq!(running.published_prices(), [6_400_000]);
@@ -128,13 +46,9 @@ async fn a_second_change_within_one_second_arrives_when_the_second_ends_with_the
     running.live_at(6_400_000).await;
 
     wait(Duration::from_millis(200)).await;
-    running
-        .report(Report::Received(price(6_400_001), None))
-        .await;
+    running.receives(6_400_001).await;
     wait(Duration::from_millis(300)).await;
-    running
-        .report(Report::Received(price(6_400_002), None))
-        .await;
+    running.receives(6_400_002).await;
     wait(Duration::from_millis(499)).await;
 
     assert_eq!(
@@ -155,15 +69,24 @@ async fn two_trades_at_the_same_new_price_within_one_second_publish_it_once() {
 
     wait(Duration::from_millis(200)).await;
     running
-        .report(Report::Received(price(6_400_001), Some(TradeId::new(1))))
+        .report(Report::Received(
+            Price::from_cents(6_400_001),
+            Some(TradeId::new(1)),
+        ))
         .await;
     wait(Duration::from_millis(300)).await;
     running
-        .report(Report::Received(price(6_400_001), Some(TradeId::new(2))))
+        .report(Report::Received(
+            Price::from_cents(6_400_001),
+            Some(TradeId::new(2)),
+        ))
         .await;
     wait(Duration::from_secs(2)).await;
     running
-        .report(Report::Received(price(6_400_001), Some(TradeId::new(3))))
+        .report(Report::Received(
+            Price::from_cents(6_400_001),
+            Some(TradeId::new(3)),
+        ))
         .await;
     wait(Duration::from_secs(2)).await;
 
@@ -178,7 +101,7 @@ async fn the_price_stream_carries_at_most_one_price_a_second() {
 
     for cents in 6_400_001..6_400_031 {
         wait(Duration::from_millis(100)).await;
-        running.report(Report::Received(price(cents), None)).await;
+        running.receives(cents).await;
     }
     wait(Duration::from_secs(1)).await;
 
@@ -226,11 +149,7 @@ async fn the_snapshot_holds_the_latest_price_and_the_servers_time() {
 #[tokio::test(start_paused = true)]
 async fn ending_the_streams_closes_every_subscription() {
     let running = Running::start();
-    let (_, mut subscription) = running
-        .game
-        .open_stream(&identity::Token::from_random_bytes([1; 32]))
-        .await
-        .unwrap();
+    let (_, mut subscription) = running.game.open_stream(&running::alice()).await.unwrap();
 
     running.game.end_streams();
 

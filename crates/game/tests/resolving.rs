@@ -4,64 +4,16 @@
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use game::{Event, Open, PlayerEvent};
-use guessing::{Direction, Outcome, PlayerId, Resolution, Score};
-use identity::Token;
+use game::{Event, PlayerEvent};
+use guessing::{Direction, Outcome, Score};
 use jiff::SignedDuration;
 use prices::{Price, Report};
-use running::{Running, settle};
+use running::{Running, alice, bob, settle};
 use support::Stores;
 
+#[expect(dead_code, reason = "this binary takes only some of the steps")]
 mod running;
 mod support;
-
-fn alice() -> Token {
-    Token::from_random_bytes([1; 32])
-}
-
-fn bob() -> Token {
-    Token::from_random_bytes([2; 32])
-}
-
-#[expect(
-    clippy::unwrap_used,
-    reason = "a test helper fails by panicking, as every test does"
-)]
-impl Running {
-    async fn places(&self, token: &Token, direction: Direction) -> Open {
-        self.game.place_guess(token, direction).await.unwrap()
-    }
-
-    async fn player(&self, token: &Token) -> PlayerId {
-        self.game.player(token).await.unwrap().unwrap()
-    }
-
-    fn waits(&self, seconds: i64) {
-        self.clock.advance(SignedDuration::from_secs(seconds));
-    }
-
-    /// Every resolution published to the Player so far.
-    fn resolutions(&self, player: PlayerId) -> Vec<Resolution> {
-        self.fanout
-            .notified()
-            .into_iter()
-            .filter(|(whose, _)| *whose == player)
-            .filter_map(|(_, event)| match event {
-                PlayerEvent::GuessResolved(resolution) => Some(resolution),
-                PlayerEvent::GuessPlaced(_) => None,
-            })
-            .collect()
-    }
-
-    fn published_prices(&self) -> Vec<u64> {
-        self.fanout
-            .published()
-            .iter()
-            .filter(|latest| !latest.is_delayed())
-            .filter_map(|latest| latest.price().map(Price::cents))
-            .collect()
-    }
-}
 
 #[tokio::test(start_paused = true)]
 async fn a_guess_resolves_on_the_first_changed_price_received_60_seconds_after_it_was_placed() {

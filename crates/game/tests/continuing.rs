@@ -5,46 +5,15 @@
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use game::{PlaceError, PlayerEvent};
-use guessing::{Direction, Outcome, PlayerId, Refusal, Resolution, Score};
-use identity::Token;
-use jiff::SignedDuration;
+use game::PlaceError;
+use guessing::{Direction, Outcome, Refusal, Score};
 use prices::Price;
-use running::{Running, settle};
+use running::{Running, alice, bob, settle};
 use support::Stores;
 
+#[expect(dead_code, reason = "this binary takes only some of the steps")]
 mod running;
 mod support;
-
-fn alice() -> Token {
-    Token::from_random_bytes([1; 32])
-}
-
-#[expect(
-    clippy::unwrap_used,
-    reason = "a test helper fails by panicking, as every test does"
-)]
-impl Running {
-    async fn player(&self, token: &Token) -> PlayerId {
-        self.game.player(token).await.unwrap().unwrap()
-    }
-
-    fn waits(&self, seconds: i64) {
-        self.clock.advance(SignedDuration::from_secs(seconds));
-    }
-
-    fn resolutions(&self, player: PlayerId) -> Vec<Resolution> {
-        self.fanout
-            .notified()
-            .into_iter()
-            .filter(|(whose, _)| *whose == player)
-            .filter_map(|(_, event)| match event {
-                PlayerEvent::GuessResolved(resolution) => Some(resolution),
-                PlayerEvent::GuessPlaced(_) => None,
-            })
-            .collect()
-    }
-}
 
 #[tokio::test(start_paused = true)]
 async fn an_open_guess_survives_a_restart_and_resolves_on_the_first_changed_price_after_it() {
@@ -173,10 +142,7 @@ async fn while_the_store_is_down_the_game_reports_it_unavailable() {
     let rebuilt = running.game.rebuild_due_guesses().await;
     let stream = running.game.open_stream(&alice()).await;
     let snapshot = running.game.snapshot(Some(alice_id)).await;
-    let guess = running
-        .game
-        .place_guess(&Token::from_random_bytes([2; 32]), Direction::Down)
-        .await;
+    let guess = running.game.place_guess(&bob(), Direction::Down).await;
 
     assert_eq!(rebuilt.unwrap_err().to_string(), STORE_DOWN);
     assert_eq!(stream.err().unwrap().to_string(), STORE_DOWN);
