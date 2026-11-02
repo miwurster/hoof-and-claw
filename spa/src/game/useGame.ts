@@ -3,6 +3,7 @@ import { useCallback, useEffect, useReducer } from "react";
 
 import { canGuess, initialState, reduce } from "./reducer";
 import type { Action, GameState } from "./reducer";
+import { pageClock } from "./useClock";
 
 /** The part of `EventSource` the hook uses. */
 export type Stream = {
@@ -60,11 +61,6 @@ function reconnectDelay(attempt: number, random: number): number {
 
 function sendFetch(url: string, init: RequestInit): Promise<Response> {
   return fetch(url, init);
-}
-
-/** The page's own clock, which the countdown runs on; never compared with the server's time. */
-function pageClock(): number {
-  return performance.now();
 }
 
 /** Decodes a response body or an event of the stream; the one place the SPA trusts the server's JSON. */
