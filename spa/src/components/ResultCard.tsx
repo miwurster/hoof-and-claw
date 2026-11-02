@@ -1,5 +1,6 @@
 import type { Direction, Outcome } from "contract";
 
+import card from "./card.module.css";
 import { formatPrice, formatScoreChange } from "./format";
 import styles from "./ResultCard.module.css";
 import clawMark from "./stamps/claw-mark.svg";
@@ -32,8 +33,8 @@ export function ResultCard({
   const wentUp = endPrice > startPrice;
 
   return (
-    <section className={styles.card} aria-label="Resolved guess">
-      <p className={styles[direction]}>{DIRECTION[direction]}</p>
+    <section className={card.card} aria-label="Resolved guess">
+      <p className={card[direction]}>{DIRECTION[direction]}</p>
       <img
         className={reducedMotion ? styles.stamp : `${styles.stamp} ${styles.landing}`}
         src={wentUp ? hoofPrint : clawMark}

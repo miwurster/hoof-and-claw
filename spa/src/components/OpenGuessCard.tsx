@@ -1,6 +1,8 @@
 import type { Direction } from "contract";
 
+import card from "./card.module.css";
 import { formatDifference, formatPrice, formatSeconds } from "./format";
+import hidden from "./hidden.module.css";
 import styles from "./OpenGuessCard.module.css";
 
 const GUESS_MS = 60_000;
@@ -39,8 +41,8 @@ export function OpenGuessCard({
   const drained = RING * (1 - Math.min(remainingMs, GUESS_MS) / GUESS_MS);
 
   return (
-    <section className={styles.card} aria-label="Open guess">
-      <p className={styles[direction]}>{DIRECTION[direction]}</p>
+    <section className={card.card} aria-label="Open guess">
+      <p className={card[direction]}>{DIRECTION[direction]}</p>
       <div className={waiting ? styles.pulse : styles.timer}>
         <svg className={styles.ring} viewBox="0 0 100 100" aria-hidden="true">
           <circle className={styles.track} cx="50" cy="50" r="45" />
@@ -56,7 +58,7 @@ export function OpenGuessCard({
         {waiting ? null : (
           <p className={styles.seconds}>
             {formatSeconds(remainingMs)}
-            <span className={styles.hidden}> seconds left</span>
+            <span className={hidden.hidden}> seconds left</span>
           </p>
         )}
       </div>

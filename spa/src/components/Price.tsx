@@ -1,4 +1,5 @@
 import { formatPrice } from "./format";
+import hidden from "./hidden.module.css";
 import styles from "./Price.module.css";
 
 /**
@@ -10,7 +11,7 @@ export function Price({ price, delayed }: { readonly price: number | null; reado
     <section className={styles.board} aria-label="BTC/USD price">
       <p className={delayed ? styles.delayedPrice : styles.price}>{formatPrice(price)}</p>
       <p className={styles.pair}>BTC/USD</p>
-      <output className={delayed ? styles.label : styles.hidden}>{delayed ? "Price delayed" : "Price live"}</output>
+      <output className={delayed ? styles.label : hidden.hidden}>{delayed ? "Price delayed" : "Price live"}</output>
     </section>
   );
 }

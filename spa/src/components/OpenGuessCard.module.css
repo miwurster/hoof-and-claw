@@ -1,26 +1,3 @@
-.card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--color-turf);
-  text-align: center;
-}
-
-.card p {
-  margin: 0;
-}
-
-.up {
-  color: var(--color-pasture);
-}
-
-.down {
-  color: var(--color-rust);
-}
-
 .timer {
   position: relative;
   width: var(--size-ring);
@@ -83,16 +60,6 @@
 
 .wrong {
   color: var(--color-rust);
-}
-
-/* Read by a screen reader, not shown. */
-.hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 @keyframes pulse {

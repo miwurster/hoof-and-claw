@@ -1,6 +1,6 @@
 import type { Outcome } from "contract";
 
-import styles from "./OutcomeAnnouncement.module.css";
+import hidden from "./hidden.module.css";
 
 const OUTCOME = { correct: "Correct", wrong: "Wrong" } as const;
 
@@ -10,7 +10,7 @@ const OUTCOME = { correct: "Correct", wrong: "Wrong" } as const;
  */
 export function OutcomeAnnouncement({ outcome }: { readonly outcome: Outcome | null }) {
   return (
-    <output aria-live="polite" className={styles.hidden}>
+    <output aria-live="polite" className={hidden.hidden}>
       {outcome === null ? null : `Your Guess resolved ${OUTCOME[outcome]}.`}
     </output>
   );
