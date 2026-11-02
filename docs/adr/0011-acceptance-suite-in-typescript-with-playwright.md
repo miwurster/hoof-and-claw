@@ -109,7 +109,7 @@ The checks against the deployed service, `pnpm smoke` after every Release and `p
 ### Acceptance test-driven
 
 Every acceptance criterion of the spec is written as a test case in the DSL before the code that makes it pass, and the spec points to its cases.
-The `write-acceptance-tests` skill writes them as Pending tests, and the spec lens of the code review counts a criterion as implemented once the diff lifts its marker.
+They start as Pending tests, and a criterion counts as implemented once a change lifts its marker.
 The rules of the brief form the first set: the visible Score and price, one guess at a time, resolution after at least 60 seconds and a changed price, plus or minus one, and a start at 0.
 
 ## Considered Options

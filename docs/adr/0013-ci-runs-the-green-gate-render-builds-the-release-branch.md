@@ -32,8 +32,7 @@ Both run by hand from the acceptance package, outside the Green gate and without
   The health endpoint reports Render's `RENDER_GIT_COMMIT`, so the smoke test also checks that the released SHA is live.
 - **`pnpm smoke:hold`** once after the first Release holds an SSE stream open for two hours to show that Render's proxy does not cut it.
   Render documents a 100-minute limit on HTTP responses without saying whether it applies to SSE, and two hours cover it.
-  If the limit cuts the stream, the client reconnects and rebuilds its state from the snapshot, so the game keeps working.
-  If it does, the heartbeat interval changes, not the architecture.
+  If the limit cuts the stream, the client reconnects and rebuilds its state from the snapshot, so the game keeps working, and the keepalive interval changes, not the architecture.
 
 ## Considered Options
 
@@ -47,7 +46,7 @@ Both run by hand from the acceptance package, outside the Green gate and without
 - **A merge commit as a Release.** Rejected, because it creates a SHA without a gate run and lets `release` drift from `main`.
 - **Parallel jobs for the parts of the gate.** Rejected for now, because CI would no longer run the one command everyone else runs.
 - **`just` as the task runner.** Rejected, because tool versions would then be pinned in a second place.
-- **The one-hour SSE hold in every pipeline or on a schedule.** Rejected.
+- **The two-hour SSE hold in every pipeline or on a schedule.** Rejected.
   It tests a fact about the platform, not about a commit, and a cut stream costs a client only a reconnect with a fresh snapshot (ADR 0010).
 
 ## Consequences

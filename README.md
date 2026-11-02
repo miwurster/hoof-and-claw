@@ -282,7 +282,7 @@ We would not use these as the primary store:
 Agents write the code.
 Quality comes from guardrails that run in one Green gate, `mise run gate`, locally and in CI:
 
-- **Unit and domain tests.** They are written test-first, with property-based tests for the game rules.
+- **Unit and domain tests.** They are written test-first, and every port's adapters, fakes included, pass one shared suite.
 - **An acceptance suite.** It runs on Playwright and TypeScript, in four layers: test cases in domain language, a DSL, protocol drivers, and the system under test.
   Every case runs twice, through the browser UI and through the HTTP API.
   A controllable clock and price source make 60-second rules testable without waiting, and a controllable store fails saves on demand:

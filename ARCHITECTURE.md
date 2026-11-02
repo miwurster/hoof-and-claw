@@ -52,6 +52,8 @@ No module is called `models`, `services`, `repositories`, `utils` or `helpers`; 
 
 - A port is a plain trait named after the capability in glossary terms: `PriceSource`, never `PriceSourcePort`, `IPriceSource`, `PriceSourceImpl`, or a `Service`, `Manager` or `Repository` suffix.
 - A trait exists only where two implementations exist; everything else is a concrete type or a free function.
+  So `identity` has no `Identity` port: issuing and hashing a token are free functions with one implementation, and the lookup goes through its store port (ADR 0008).
+  An `Identity` port arrives with a second way of signing in (ADR 0001).
 - Every adapter of a port, fake included, passes one shared test suite for that port, kept next to the port.
 - The cores never read the clock; `game` reads `Clock` and passes the time in.
   `SystemTime::now` and `Instant::now` are allowed only in the system clock adapter; enforced by Clippy `disallowed-methods` in `clippy.toml`.
@@ -119,7 +121,7 @@ The checks in `smoke/` run by hand from `smoke.config.ts`, with no global setup 
 
 | Layer                                      | Where                                                    | Tool                           |
 | ------------------------------------------ | -------------------------------------------------------- | ------------------------------ |
-| Domain rules of a core                     | the core's own tests                                     | `cargo-nextest`, `proptest`    |
+| Domain rules of a core                     | the core's own tests                                     | `cargo-nextest`                |
 | A port's contract                          | one shared suite per port, run against every adapter     | `cargo-nextest`                |
 | `game`                                     | `game`'s tests with the fakes and the recording `Fanout` | `cargo-nextest`                |
 | Reducer, hook, presentational components   | beside the code in `spa/`                                | Vitest, Testing Library        |

@@ -13,16 +13,16 @@ The evidence behind each choice is in the [research on Rust project standards](.
   axum has built-in SSE with keep-alive and about 11 times the downloads of actix-web.
 - **Store.** sqlx with `query!` macros checked at compile time against committed offline `.sqlx` metadata, embedded migrations, and a write pool of exactly one connection.
   Every store adapter must pass one shared test suite for the store port.
-That suite makes swapping the store safe, not sqlx's Postgres support.
+  That suite makes swapping the store safe, not sqlx's Postgres support.
 - **Price source feed.** `tokio-tungstenite` with rustls and `webpki-roots`.
   The binary installs exactly one rustls crypto provider at start-up, because without one the first `wss://` connect panics.
 - **Errors.** `thiserror` in the domain and adapters, `anyhow` only in the binary.
-The HTTP layer maps each domain error to a status code explicitly.
+  The HTTP layer maps each domain error to a status code explicitly.
 - **Configuration.** `clap` with its `env` feature reads environment variables once at start-up.
-The server refuses to start on invalid configuration.
+  The server refuses to start on invalid configuration.
 - **Logging.** `tracing` with `EnvFilter` from `RUST_LOG`, defaulting to `info`.
   `LOG_FORMAT` selects `text`, the default for local runs, or `json`.
-Terraform sets `json` on Render, so a later log stream can read the fields without parsing text.
+  Terraform sets `json` on Render, so a later log stream can read the fields without parsing text.
 - **Image.** `cargo-chef` for cached dependency layers, a glibc build, and `gcr.io/distroless/cc-debian13:nonroot` at runtime.
 
 ## Guardrails
@@ -38,12 +38,12 @@ All of these run in the Green gate, and any warning fails it.
 - The gate also runs `rustfmt --check` and `cargo sqlx prepare --workspace --check`.
 - `cargo-deny` checks advisories, licences and duplicate crates, and bans `openssl`.
 - `cargo-shear` reports unused dependencies and source files no module includes.
-- `cargo-nextest` runs the tests and `cargo test --doc` the doctests, `proptest` covers domain rules, and tests use hand-written fakes for the ports instead of `mockall`.
+- `cargo-nextest` runs the tests and `cargo test --doc` the doctests, and tests use hand-written fakes for the ports instead of `mockall`.
 
 ## Considered Options
 
 - **TypeScript on Node.** Rejected.
-  It shares types directly with the React frontend and the engineer can read every diff, but the map had already decided that guardrails define quality, not review.
+  It shares types directly with the React frontend and the engineer can read every diff, but the map in issue #1 had already decided that guardrails define quality, not review.
   `strict` mode and ESLint let `any`, unhandled promises and runtime type gaps through, and layer rules need a separately configured tool such as dependency-cruiser.
 - **actix-web, poem or loco instead of axum.** Rejected.
   actix-web has its own runtime model and a smaller middleware ecosystem.
