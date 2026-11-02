@@ -1,17 +1,17 @@
 # Host the demo as one always-on Render web service with SQLite, with a scale path to AWS
 
 The demo runs as a single Rust process on a Render web service on the Starter plan in Frankfurt, with SQLite on a Render persistent disk, for about 7.25 USD a month.
-The process serves the React build and the API from `hoof-and-claw.miwurster.com`, holds the WebSocket feed to the Price source, pushes prices to browsers over server-sent events (SSE), and resolves due guesses on each price it receives, with no browser open.
-The brief prefers AWS, but on AWS an always-on process costs more than the 10 EUR a month this demo may spend, and a serverless AWS design would trade the live feed for polling and a scheduler per guess.
+The process serves the React build and the API from `hoof-and-claw.miwurster.com`, holds the WebSocket feed to the Price source, pushes prices to browsers over server-sent events (SSE), and resolves due Guesses on each price it receives, with no browser open.
+The brief prefers AWS, but on AWS an always-on process costs more than the 10 EUR a month this demo may spend, and a serverless AWS design would trade the live feed for polling and a scheduler per Guess.
 One always-on process is the simplest design that meets every rule of the brief, so the demo uses Render, and AWS is the planned next step once one instance is no longer enough.
 
 ## Considered Options
 
-- **AWS serverless: CloudFront, S3, Lambda in Rust, DynamoDB, an EventBridge Scheduler call per guess.** Not chosen for the demo; it is the first candidate on the scale path.
+- **AWS serverless: CloudFront, S3, Lambda in Rust, DynamoDB, an EventBridge Scheduler call per Guess.** Not chosen for the demo; it is the first candidate on the scale path.
   It costs about 0 to 2 USD a month and matches "AWS preferred".
-  A scheduler call per guess is too coarse: EventBridge Scheduler fires with 60-second precision, so a guess nobody watches resolves up to about two minutes after it falls due.
-  A Rust Lambda can instead hold the price feed in overlapping 15-minute runs started every 13 minutes, within the free tier, and resolve due guesses on every trade (research "[AWS serverless for the game](../research/aws-serverless-for-the-game.md)").
-  It still gives up one clock, because accepting a guess and receiving prices run on different machines (ADR 0002), and push, because browsers poll a cached price; CloudFront cannot share one SSE stream across viewers.
+  A scheduler call per Guess is too coarse: EventBridge Scheduler fires with 60-second precision, so a Guess nobody watches resolves up to about two minutes after it falls due.
+  A Rust Lambda can instead hold the price feed in overlapping 15-minute runs started every 13 minutes, within the free tier, and resolve due Guesses on every trade (research "[AWS serverless for the game](../research/aws-serverless-for-the-game.md)").
+  It still gives up one clock, because accepting a Guess and receiving prices run on different machines (ADR 0002), and push, because browsers poll a cached price; CloudFront cannot share one SSE stream across viewers.
   A crashed run can leave the feed down for minutes.
   Push services such as AppSync Events or IoT Core charge about 1 USD per million messages, so one price a second to 1,000 Players costs about 2,600 USD a month.
 - **AWS always-on: App Runner or ECS Fargate.** Rejected.
@@ -32,7 +32,7 @@ One always-on process is the simplest design that meets every rule of the brief,
 
 - A Render service with a disk runs exactly one instance, so price ingestion and resolution need no leader election.
 - Every deploy briefly takes the game down, and so does every platform maintenance window, which Render announces and holds at most about once every three months.
-  Open guesses survive, because the server persists a guess before it acknowledges it, and they resolve on the first changed price after the restart (see ADR 0002).
+  Open guesses survive, because the server persists a Guess before it acknowledges it, and they resolve on the first changed price after the restart (see ADR 0002).
 - SSE streams and the feed close on every deploy.
   Clients reconnect and rebuild their state from the snapshot that opens every stream (ADR 0010), and the server sends SSE heartbeats, because Render documents no timeout for streaming responses.
   A check run by hand after the first Release holds an SSE stream open for two hours against the deployed service (ADR 0013).
@@ -41,7 +41,7 @@ One always-on process is the simplest design that meets every rule of the brief,
   At 20 viewers for 4 hours a day this is about 1.3 GB a month, inside the 5 GB Render includes.
   Past that, Render bills 0.15 USD per GB.
 - Persistence sits behind a store port whose operations follow the game's access patterns, not SQL.
-  They load a Player, place a guess if none is open, and resolve a guess idempotently while adjusting the Score.
+  They load a Player, place a Guess if none is open, and resolve a Guess idempotently while adjusting the Score.
   The SQLite adapter runs in WAL mode with a single writing connection and `synchronous=NORMAL`.
   With SQLite's default `FULL`, every commit waits for an fsync, and the writes queue behind the one connection.
   200 Guesses placed at once then took p95 about 270 ms on a Linux runner with 2 CPUs, against the 100 ms budget of ADR 0015.
@@ -65,10 +65,10 @@ One always-on process is the simplest design that meets every rule of the brief,
 
 ## Scale path
 
-The numbers assume each concurrent Player places about one guess a minute, which is close to the maximum because a guess stays open for at least 60 seconds.
-That gives about one guess a second per 60 Players, and about 2.5 writes per guess for the guess itself, the Player on a first guess, and the resolution with its Score.
+The numbers assume each concurrent Player places about one Guess a minute, which is close to the maximum because a Guess stays open for at least 60 seconds.
+That gives about one Guess a second per 60 Players, and about 2.5 writes per Guess for the Guess itself, the Player on a first Guess, and the resolution with its Score.
 The server pushes one price a second, at about 150 bytes per SSE message including overhead, and the traffic column assumes viewers connected around the clock.
-The server never stores prices, only the Start and End price of each guess.
+The server never stores prices, only the Start and End price of each Guess.
 
 | Concurrent Players | Guesses a second | Writes a second | SSE connections | Outbound traffic |
 | --- | --- | --- | --- | --- |
@@ -97,10 +97,10 @@ What each step means for the application:
   This can stay on Render or move to AWS or another cloud; the reasons to move are traffic cost per GB, failover across availability zones, and where the organisation already runs.
 - **100,000 Players.** One process is no longer enough.
   One ingesting process, with a standby that takes over through a lease, publishes each price to several stateless SSE servers over a pub/sub channel, for example Redis or NATS.
-  Guesses move to Postgres or DynamoDB, and resolution is partitioned by Player, each partition with its own index of due guesses.
+  Guesses move to Postgres or DynamoDB, and resolution is partitioned by Player, each partition with its own index of due Guesses.
   Prices carry a sequence number from the ingesting process, so every partition resolves against the same prices.
 - **1,000,000 Players and beyond.** This needs its own design work, beyond what this ADR can settle.
-  The open questions are how to deliver one price to a million connections affordably, how to shard storage and resolution, and how to absorb the burst when many guesses fall due on the same price.
+  The open questions are how to deliver one price to a million connections affordably, how to shard storage and resolution, and how to absorb the burst when many Guesses fall due on the same price.
 
 The domain core stays the same at every step.
 The adapters change behind the ports: the store, the delivery of prices to clients, and how resolution is partitioned.

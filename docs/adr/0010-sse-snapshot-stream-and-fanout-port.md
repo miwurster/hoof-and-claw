@@ -14,8 +14,8 @@ This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time deli
   There is no replay through `Last-Event-ID`.
   The HTTP read of the Player's state stays for uses outside the stream.
 - **Idempotent events.** The server subscribes the tab before it builds the snapshot, so an event from that short window may arrive after a snapshot that already contains it.
-  Events therefore carry absolute values, such as the new Score and the guess's ID, not deltas.
-  The client's reducer ignores a resolution for a guess it does not hold as open, so applying an event twice changes nothing.
+  Events therefore carry absolute values, such as the new Score and the Guess's ID, not deltas.
+  The client's reducer ignores a resolution for a Guess it does not hold as open, so applying an event twice changes nothing.
 - **Price throttle.** `game` publishes at most one price event a second for the whole server, and only when the price changed.
   The first change after a quiet second goes out at once.
   A later change within the same second goes out when the second ends, with the newest price, so the stream never lags the latest price by more than one second.
@@ -24,16 +24,16 @@ This settles what ADR 0003, ADR 0005 and ADR 0007 left open about real-time deli
   The throttle sits in `game`, before the port, so every adapter gets the same rate.
   It runs on `tokio`'s real time, not on the `Clock` port, which is the domain's time only (ADR 0011).
 - **Every tab of the Player.** Every event about a Player goes to every open tab of that Player: Guess placed, and Guess resolved with its Outcome, End price and new Score.
-  A guess placed in one tab therefore shows up in the others.
+  A Guess placed in one tab therefore shows up in the others.
 - **Order on each trade.** For each received price, `game`:
   1. takes from the index every Open guess that is due and whose Start price differs from the price, and keeps the received price as their End price;
   2. saves the Outcomes and Scores in one transaction through the store port;
   3. only after the save succeeds, publishes the resolution events, then the price.
 
-  A guess taken from the index waits in memory with its End price until the save succeeds, so a later trade cannot give it a different End price.
+  A Guess taken from the index waits in memory with its End price until the save succeeds, so a later trade cannot give it a different End price.
   If the save fails, `game` retries it with the same End price.
-  The save is a conditional update that only resolves a guess that is still open, so a retry cannot resolve a guess twice.
-- **Order on placing a guess.** `game` saves the guess, adds it to the index, publishes Guess placed to the Player's tabs, then answers the HTTP request.
+  The save is a conditional update that only resolves a Guess that is still open, so a retry cannot resolve a Guess twice.
+- **Order on placing a Guess.** `game` saves the Guess, adds it to the index, publishes Guess placed to the Player's tabs, then answers the HTTP request.
 - **A tab that stops reading.** The price uses one latest-value slot per tab (ADR 0007).
   A tab's Player events go into a queue bounded at 16 events.
   If the queue is full, the adapter closes that tab's stream.
@@ -96,12 +96,12 @@ The scale path below splits `Fanout` into a price broadcast and Player notificat
 
 - ADR 0003 and ADR 0005 now say that a reconnecting client gets its state from the snapshot.
 - ADR 0008 lists `Fanout` as its fourth port.
-- If the server restarts while a save is being retried, the guess is still open in the store and resolves against the first changed price after the restart, as ADR 0002 already defines for guesses that fall due during a restart.
+- If the server restarts while a save is being retried, the Guess is still open in the store and resolves against the first changed price after the restart, as ADR 0002 already defines for Guesses that fall due during a restart.
 - ADR 0014 fixes the event names and payloads.
 
 ## Scale path
 
-The numbers come from ADR 0003's scale path, which assumes about one guess a minute per concurrent Player and one price event a second.
+The numbers come from ADR 0003's scale path, which assumes about one Guess a minute per concurrent Player and one price event a second.
 The domain core stays the same at every step; what changes is the adapter behind `Fanout`, the store, and how resolution is partitioned.
 
 - **1,000 Players.** One process is still enough, and prices stay on the game server's own stream.
@@ -114,10 +114,10 @@ The domain core stays the same at every step; what changes is the adapter behind
 - **100,000 Players.** One ingesting process, with a standby that takes over through a lease, receives the trades.
   It stamps each price with its receipt time and a sequence number that only grows, and publishes it over a pub/sub channel such as Redis or NATS.
   Stateless SSE servers subscribe to prices and to the Player events of the tabs they hold.
-  Resolution is partitioned by Player, and every partition resolves against the same sequence of prices, so the End price of a guess does not depend on which partition holds it.
+  Resolution is partitioned by Player, and every partition resolves against the same sequence of prices, so the End price of a Guess does not depend on which partition holds it.
   The receipt time comes from the ingesting process alone, so one clock still decides the 60-second boundary (ADR 0002).
-- **Many guesses due on one price.** Bitstamp can go 30 s without a trade (ADR 0007).
-  At 100,000 Players about 1,700 guesses fall due each second, so one trade after a quiet 30 s can resolve about 50,000 guesses at once.
+- **Many Guesses due on one price.** Bitstamp can go 30 s without a trade (ADR 0007).
+  At 100,000 Players about 1,700 Guesses fall due each second, so one trade after a quiet 30 s can resolve about 50,000 Guesses at once.
   Each partition saves them in bounded batches, one transaction per batch, and publishes each batch after its save, so the burst spreads over a few seconds instead of one huge transaction.
 - **1,000,000 Players and beyond.** As in ADR 0003, this needs its own design.
   Delivering one price a second to a million connections calls for a managed push service or a tree of relays, and the burst on one trade grows to about 500,000 resolutions.

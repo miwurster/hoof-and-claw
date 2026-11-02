@@ -14,7 +14,7 @@ What the compiler, Clippy, Oxlint, anti-slop, Stylelint or cargo-deny already en
 
 ## Time
 
-- The domain's time comes only from the `Clock` port: when a guess was placed and when it falls due.
+- The domain's time comes only from the `Clock` port: when a Guess was placed and when it falls due.
 - Infrastructure timing, such as the price throttle, the SSE keepalive, heartbeats and reconnect backoff, runs on `tokio`'s real time, never on `Clock`.
 - The client never decides an Outcome and never compares a server time with its own clock.
   It counts down from when it received the server's remaining time, and only the server's resolution event ends an Open guess.

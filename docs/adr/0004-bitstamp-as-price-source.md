@@ -33,11 +33,11 @@ All terms were read on 2026-10-31.
 ## Consequences
 
 - Guesses resolve later than they would on Coinbase or Kraken.
-  With gaps of up to about 30 seconds between price changes, a guess usually resolves between 60 and 90 seconds after it was placed.
-  The rules still hold, because a guess resolves on the first changed price after 60 seconds (ADR 0002).
+  With gaps of up to about 30 seconds between price changes, a Guess usually resolves between 60 and 90 seconds after it was placed.
+  The rules still hold, because a Guess resolves on the first changed price after 60 seconds (ADR 0002).
 - Bitstamp's tick size for BTC/USD is 0.01 USD, the same as Coinbase's, so the price precision in ADR 0002 stands.
 - There is no fallback whose terms allow the demo.
-  When Bitstamp's feed is down, nothing resolves and the price shown is stale; ADR 0007 decides how the game shows that and what happens to open guesses.
+  When Bitstamp's feed is down, nothing resolves and the price shown is stale; ADR 0007 decides how the game shows that and what happens to Open guesses.
 - The terms can change without notice, as Coinbase's did in August 2026.
   The spec names the terms read here, and they are read again before any step on the path below.
 - Agent-run tests and test environments use a stubbed price source, not a live feed, which also keeps clear of Coinbase's clause on AI and automated systems should Coinbase become a source later.
@@ -49,6 +49,6 @@ What triggers outreach is how the demo is used and how reliable it must be, not 
 
 - **Commercial use of any kind**, such as ads, paid features or running it as a product: sign Bitstamp's Data License Agreement before launch.
 - **A second source for failover or faster resolution**: agree terms with Coinbase (marketdata@coinbase.com or one of its authorized partners) or Kraken (marketdata@kraken.com) before connecting to it.
-  Coinbase and Kraken changed price two to three times as often as Bitstamp in the research's samples, so either would also shorten the time a guess stays open.
-  A second source also needs the rule from ADR 0002 that a guess only resolves against prices from the source of its Start price.
+  Coinbase and Kraken changed price two to three times as often as Bitstamp in the research's samples, so either would also shorten the time a Guess stays open.
+  A second source also needs the rule from ADR 0002 that a Guess only resolves against prices from the source of its Start price.
 - **Moving to AWS at around 10,000 Players** (ADR 0003): re-read the terms of every source in use, and confirm the agreements cover the new deployment.

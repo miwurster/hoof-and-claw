@@ -75,7 +75,7 @@ A single, mobile-first, centred column:
 
 Score and price are always visible.
 The Up and Down buttons carry plain-word labels, with the bull/bear motif only as an icon accent.
-They are disabled while a guess is open.
+They are disabled while a Guess is open.
 The rules line is muted and always present; there is no modal or onboarding flow.
 
 ## Guess card
@@ -83,7 +83,7 @@ The rules line is muted and always present; there is no modal or onboarding flow
 ### Open guess
 
 A ring drains over 60 seconds, with the remaining seconds in its centre.
-The card shows the live difference from the Start price, for example `+$12.40 ↑`, coloured by whether the guess would currently be Correct.
+The card shows the live difference from the Start price, for example `+$12.40 ↑`, coloured by whether the Guess would currently be Correct.
 The label stays factual, without "you're winning" copy.
 
 If 60 seconds have passed and the price hasn't changed, the ring becomes a slow pulse labelled "Waiting for the price to move…".
@@ -93,9 +93,9 @@ If 60 seconds have passed and the price hasn't changed, the ring becomes a slow 
 The open-guess card turns into a result card in place, with no toast or full-screen takeover.
 It shows the Start price and End price, the outcome (Correct or Wrong) and the score changing by +1 or −1.
 A stamp marks which way the price went: a hoof print in Pasture for up, a claw mark in Rust for down.
-The card stays until the next guess.
+The card stays until the next Guess.
 
-A player returning after their guess resolved while they were away sees the same result card.
+A player returning after their Guess resolved while they were away sees the same result card.
 
 ## Motion
 
@@ -106,4 +106,4 @@ With `prefers-reduced-motion`, the stamp and score appear without animation.
 ## Price unavailable
 
 When the price feed fails, the price shows its last known value in Flint, labelled "Price delayed".
-The Up and Down buttons stay disabled until the price recovers, so no guess gets a stale Start price.
+The Up and Down buttons stay disabled until the price recovers, so no Guess gets a stale Start price.

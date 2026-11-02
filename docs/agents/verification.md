@@ -60,4 +60,4 @@ Time, price and the store: only the five `test-controls` commands, at the routes
 4. Set the clock to a time.
 5. Make the store fail: nothing, every save of resolutions, or every read and write.
 
-The clock stands still until a command moves it, and a guess resolves only on a received price.
+The clock stands still until a command moves it, and a Guess resolves only on a received price.

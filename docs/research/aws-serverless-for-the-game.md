@@ -13,7 +13,7 @@ Second, "EventBridge Scheduler fires with 60-second precision, so a guess nobody
 
 The rules a design must keep, from the brief and ADRs 0002, 0003, 0007 and 0010:
 
-- A guess resolves on the first price the server receives at least 60 s after the guess that differs from the Start price, with no browser open.
+- A Guess resolves on the first price the server receives at least 60 s after the Guess that differs from the Start price, with no browser open.
 - Players always see the latest price, today pushed over SSE at most once a second, and their Score.
 - No visible cold start.
 - The demo may spend at most 10 EUR a month.
@@ -25,7 +25,7 @@ ADR 0003 was right about the timer and wrong about the feed.
 - **The feed.** A Lambda function can hold Bitstamp's WebSocket.
   An invocation runs for at most 15 minutes, so an EventBridge Scheduler rule that starts a new invocation every 13 minutes keeps one connection open at all times, with the old and new invocation overlapping for about two minutes.
   At 128 MB around the clock this uses about 374,000 GB-s a month, inside Lambda's always-free 400,000 GB-s.
-  That function can resolve due guesses on every trade, just as the Render process does, so no timer per guess is needed and a guess resolves on the first changed trade after it falls due.
+  That function can resolve due Guesses on every trade, just as the Render process does, so no timer per Guess is needed and a Guess resolves on the first changed trade after it falls due.
 - **The timer.** EventBridge Scheduler does have 60-second precision.
   SQS message timers and Step Functions Wait states take whole seconds, and DynamoDB TTL deletes "within a few days".
   With a feed function, none of them is needed.
@@ -42,9 +42,9 @@ ADR 0003 was right about the timer and wrong about the feed.
 Lines marked _(inference)_ are reasoning on top of the sources.
 Prices are US East (N. Virginia) unless a line says otherwise, because most AWS pricing pages show only that Region in text.
 
-### 1. Timing: what resolves a guess within a few seconds of falling due
+### 1. Timing: what resolves a Guess within a few seconds of falling due
 
-| Mechanism | Precision | Limits | Cost per guess | Fit |
+| Mechanism | Precision | Limits | Cost per Guess | Fit |
 | --- | --- | --- | --- | --- |
 | EventBridge Scheduler one-time schedule | 60 s | None relevant | 1 invocation, 14 M a month free | Late by up to 59 s, or about 2 min if rounded up to be safe |
 | SQS message timer | Whole seconds; no precision stated | 0 to 900 s, standard queues only | About 3 requests, 1 M a month free | Plausible, not documented |
@@ -52,7 +52,7 @@ Prices are US East (N. Virginia) unless a line says otherwise, because most AWS 
 | Step Functions Express Wait | Whole seconds | Whole workflow at most 5 minutes | Billed for duration, waiting included _(inference)_ | Plausible, not documented |
 | DynamoDB TTL | "within a few days" | n/a | Free | No |
 | Lambda durable functions wait | Not stated | Up to 1 year | About 8 USD per million operations | No Rust SDK |
-| A Lambda that holds the feed and resolves on every trade | Next trade after the guess falls due | 15 min per invocation | Shared, not per guess | Yes, same as today |
+| A Lambda that holds the feed and resolves on every trade | Next trade after the Guess falls due | 15 min per invocation | Shared, not per Guess | Yes, same as today |
 
 Verified:
 
@@ -72,11 +72,11 @@ Verified:
 Inferences:
 
 - ADR 0003's "up to about two minutes" holds only if the schedule is rounded up to the next whole minute.
-  The docs do not say whether an `at()` time with seconds fires up to 59 s after that time or anywhere in its minute, which could be before the guess is due.
-  The safe choice is to round up, and then a guess due at `hh:mm:01` fires as late as `hh:(mm+1):59`, about two minutes later.
+  The docs do not say whether an `at()` time with seconds fires up to 59 s after that time or anywhere in its minute, which could be before the Guess is due.
+  The safe choice is to round up, and then a Guess due at `hh:mm:01` fires as late as `hh:(mm+1):59`, about two minutes later.
 - A timer only says when to look.
   Without a feed, the resolver must still find the first changed price after the due time, which brings back the REST question in section 2.
-- With a function that holds the feed (section 2), resolution happens on the trade itself, as in ADR 0007, and no timer per guess is needed.
+- With a function that holds the feed (section 2), resolution happens on the trade itself, as in ADR 0007, and no timer per Guess is needed.
 
 ### 2. Price feed: holding Bitstamp's WebSocket without a server
 
@@ -107,7 +107,7 @@ Inferences:
 - **Using Lambda against its design.** AWS describes Lambda as being for short-lived work, and nothing in the docs promises that an invocation keeps an outbound WebSocket for its full 15 minutes.
   The overlap covers a run that dies early only if the next one has already started, so a crash in mid-run can leave the feed down for up to 13 minutes.
   The design needs an alarm on missing heartbeats, and possibly a second, staggered rule.
-- **Resolving in the feed function.** On each trade it writes the latest price to one DynamoDB item and queries a sparse index of Open guesses by due time for guesses with `dueAt <= receivedAt`, then resolves them with conditional writes.
+- **Resolving in the feed function.** On each trade it writes the latest price to one DynamoDB item and queries a sparse index of Open guesses by due time for Guesses with `dueAt <= receivedAt`, then resolves them with conditional writes.
   Two overlapping invocations may both see the same trade; the conditional write lets the first one win, and both pick the same trade as End price because both apply the same rule.
   This keeps ADR 0002's rule, but the "server" is now whichever feed invocation received the trade.
 - **Two clocks.** The API function stamps `placedAt` and the feed function stamps `receivedAt`, on different hosts.
@@ -117,7 +117,7 @@ Inferences:
   A one-task Spot service is down until capacity returns after an interruption, so the Lambda feed is both cheaper and no less available.
 - **REST instead of a feed.** A resolver that fires at or after the due time can read `transactions?time=hour` and take the first trade with `date >= dueAt` whose price differs from the Start price.
   That changes the End price rule from server receipt time to Bitstamp's trade time, which ADR 0002 rejected, and Bitstamp's `date` has only whole seconds, so trades in the due second are ambiguous.
-  One shared poll a second uses 600 of the 10,000 requests per 10 minutes; a REST call per guess runs out at about 16 guesses a second, roughly 1,000 Players.
+  One shared poll a second uses 600 of the 10,000 requests per 10 minutes; a REST call per Guess runs out at about 16 Guesses a second, roughly 1,000 Players.
   The feed function makes this unnecessary.
 
 ### 3. Push to browsers
@@ -187,9 +187,9 @@ Inferences:
 
 Assumptions, as in ADR 0003:
 
-- Demo: 20 concurrent Players, 4 hours a day, 30 days a month, each placing one guess a minute and polling the price once a second.
-  That is 8.64 M price polls and 144,000 guesses a month.
-- Scale: 1,000 and 10,000 concurrent Players around the clock, each placing about one guess a minute and receiving one price a second.
+- Demo: 20 concurrent Players, 4 hours a day, 30 days a month, each placing one Guess a minute and polling the price once a second.
+  That is 8.64 M price polls and 144,000 Guesses a month.
+- Scale: 1,000 and 10,000 concurrent Players around the clock, each placing about one Guess a minute and receiving one price a second.
 - The feed function runs around the clock at every scale.
 
 Demo, best serverless design (section 6), one month:
@@ -197,9 +197,9 @@ Demo, best serverless design (section 6), one month:
 | Item | Usage | Cost |
 | --- | --- | --- |
 | Feed function, 128 MB | About 374,000 GB-s, 3,300 invocations | 0 USD (always free) |
-| API functions, 128 MB | About 2.5 M requests (guesses and Player polls), about 6,000 GB-s | About 0.30 USD for requests past 1 M |
+| API functions, 128 MB | About 2.5 M requests (Guesses and Player polls), about 6,000 GB-s | About 0.30 USD for requests past 1 M |
 | EventBridge Scheduler | About 3,300 invocations | 0 USD |
-| DynamoDB | About 0.3 writes a second for prices, 0.14 for guesses, one query per trade | 0 USD with provisioned capacity inside 25 WCU and 25 RCU; about 1 USD on demand |
+| DynamoDB | About 0.3 writes a second for prices, 0.14 for Guesses, one query per trade | 0 USD with provisioned capacity inside 25 WCU and 25 RCU; about 1 USD on demand |
 | CloudFront | About 11 M requests, a few GB | About 1.20 USD for requests past 10 M |
 | S3 for the SPA | A few MB | Cents |
 | Total | | **About 0 to 2 USD a month** |
@@ -208,7 +208,7 @@ Inferences on the demo:
 
 - Without Lambda's free tier, the feed function costs about 6 USD and the rest stays under 3 USD, so the demo still stays under the 10 EUR cap.
   The CloudFront and DynamoDB allowances are always free on every account; without them, CloudFront alone would cost about 13 USD for 11 M requests.
-- Replacing Player polls with AppSync Events for Player events adds about 0.3 USD a month (2 messages per guess); pushing prices through AppSync Events too would add about 2.8 USD at 0.32 changes a second, or 8.6 USD at one a second, which breaks the cap.
+- Replacing Player polls with AppSync Events for Player events adds about 0.3 USD a month (2 messages per Guess); pushing prices through AppSync Events too would add about 2.8 USD at 0.32 changes a second, or 8.6 USD at one a second, which breaks the cap.
 - CloudWatch Logs is not counted; a chatty feed function could cost more than everything else, so logs need to stay small.
 
 Scale, one month around the clock (2.59 M seconds), price channel only:
@@ -220,7 +220,7 @@ Scale, one month around the clock (2.59 M seconds), price channel only:
 
 Guesses at scale, serverless:
 
-| Concurrent Players | Guesses a month | Lambda | DynamoDB on demand (about 2.5 writes per guess) | Player events via AppSync (2 per guess) |
+| Concurrent Players | Guesses a month | Lambda | DynamoDB on demand (about 2.5 writes per Guess) | Player events via AppSync (2 per Guess) |
 | --- | --- | --- | --- | --- |
 | 1,000 | 43 M | About 10 USD | About 70 USD | About 90 USD |
 | 10,000 | 432 M | About 100 USD | About 700 USD | About 900 USD |
@@ -231,7 +231,7 @@ Inferences on scale:
   Every per-message service costs about 1 USD per million deliveries, while an SSE server pays only for bytes, about 150 bytes per price.
   Pushing only changes (about 0.32 a second) brings the price channel to about 830 USD at 1,000 Players, still more than ten times the always-on bandwidth cost.
 - Guess handling stays reasonable on serverless at both scales; it is the fan-out of prices that does not.
-- The cheapest AWS design at scale is therefore a hybrid of serverless for guesses and resolution and an always-on SSE tier for prices (for example on Fargate or EC2 with its own egress), which ADR 0010's `Fanout` port already allows.
+- The cheapest AWS design at scale is therefore a hybrid of serverless for Guesses and resolution and an always-on SSE tier for prices (for example on Fargate or EC2 with its own egress), which ADR 0010's `Fanout` port already allows.
 
 ### 6. Verdict and the best serverless design
 
@@ -242,10 +242,10 @@ The best serverless design for the demo, in `eu-central-1` next to Bitstamp's lo
   It holds `live_trades_btcusd`, seeds from the REST ticker on connect, sends heartbeats as ADR 0007 requires, and on each trade:
   1. writes the latest price, its `receivedAt` and health to one DynamoDB item;
   2. queries Open guesses with `dueAt <= receivedAt` and resolves those whose Start price differs, with conditional writes that adjust the Score.
-- **API function** in Rust behind CloudFront, as a function URL with origin access control, to place a guess and read a Player's snapshot.
-  Placing a guess reads the latest-price item; if its health is stale, the price counts as Price delayed and the guess is refused.
+- **API function** in Rust behind CloudFront, as a function URL with origin access control, to place a Guess and read a Player's snapshot.
+  Placing a Guess reads the latest-price item; if its health is stale, the price counts as Price delayed and the Guess is refused.
 - **Price channel.** Browsers poll `GET /price` through CloudFront with `max-age=1` once a second.
-- **Player events.** The client polls its snapshot every couple of seconds while a guess is due, or subscribes to an AppSync Events channel per Player.
+- **Player events.** The client polls its snapshot every couple of seconds while a Guess is due, or subscribes to an AppSync Events channel per Player.
 - **Store.** DynamoDB replaces SQLite behind the existing store port.
 
 What it gives up against the current design:
@@ -264,7 +264,7 @@ What it gains:
 - No disk to lose, because DynamoDB keeps the Scores, which removes ADR 0003's "no database backup" risk.
 
 ADR 0003 dismissed serverless AWS partly on a wrong premise.
-"Nothing holds the price feed" is not true, because a scheduled Lambda can hold it inside the free tier and resolve guesses on every trade, so the 60-second precision of EventBridge Scheduler does not matter.
+"Nothing holds the price feed" is not true, because a scheduled Lambda can hold it inside the free tier and resolve Guesses on every trade, so the 60-second precision of EventBridge Scheduler does not matter.
 At demo scale serverless AWS meets the brief's rules, fits the 10 EUR cap with a wide margin, and costs less than Render.
 It pays for that with polling instead of push, two clocks, and more moving parts.
 The ADR's scale path is the part that should change most, because serverless AWS is the cheapest option for the demo and the most expensive for delivering prices at 1,000 Players and above.

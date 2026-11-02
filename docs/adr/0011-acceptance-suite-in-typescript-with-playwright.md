@@ -79,10 +79,10 @@ The game tries a failed save of resolutions again after a growing wait on `tokio
 A count of `n` failures would race the test's steps against those retries, and a case could pass with a bug back in; a state holds until the test changes it, so the case decides when the store recovers.
 
 The controllable `Clock` stands still until a test moves it.
-Resolution happens on a received price (ADR 0010), so a test places a guess, advances the clock, sends a price and checks the Outcome, with no race.
+Resolution happens on a received price (ADR 0010), so a test places a Guess, advances the clock, sends a price and checks the Outcome, with no race.
 In the UI driver, `clock.advance` also moves the browser's clock with `page.clock`, so the countdown follows the server.
 
-The `Clock` port is the domain's time only: when a guess was placed and when it falls due.
+The `Clock` port is the domain's time only: when a Guess was placed and when it falls due.
 The price throttle and the SSE keepalive from ADR 0010 run on `tokio`'s real time, because they are infrastructure.
 A second price within the same second therefore reaches the test after at most one real second, and the waiting assertions absorb that.
 
@@ -110,7 +110,7 @@ The checks against the deployed service, `pnpm smoke` after every Release and `p
 
 Every acceptance criterion of the spec is written as a test case in the DSL before the code that makes it pass, and the spec points to its cases.
 They start as Pending tests, and a criterion counts as implemented once a change lifts its marker.
-The rules of the brief form the first set: the visible Score and price, one guess at a time, resolution after at least 60 seconds and a changed price, plus or minus one, and a start at 0.
+The rules of the brief form the first set: the visible Score and price, one Guess at a time, resolution after at least 60 seconds and a changed price, plus or minus one, and a start at 0.
 
 ## Considered Options
 

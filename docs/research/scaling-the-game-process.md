@@ -114,7 +114,7 @@ Numbers are from one run each; treat them as orders of magnitude, not budgets.
 - CPU cost was about 20 µs per stream per event at 10,000 streams, mostly the `write` syscall per stream; serialising once and sharing `Bytes` leaves only a 160-byte copy per stream.
 - At 10,000 streams, 1 of 19 ticks had a straggler arriving after 7.5 s.
   The client runs on the same cores, so this may be the client; it is a reason to measure the tail on Linux before relying on it.
-- SQLite (rusqlite, WAL, one connection) resolving guesses with a conditional `UPDATE … WHERE resolved_at IS NULL` plus a Score update, two rows per guess:
+- SQLite (rusqlite, WAL, one connection) resolving Guesses with a conditional `UPDATE … WHERE resolved_at IS NULL` plus a Score update, two rows per Guess:
 
 | Guesses per transaction | Rows a second, `synchronous=NORMAL` | Time per transaction |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ macOS `fsync` does not flush the drive cache, so `synchronous=FULL` looked almos
 | CPU for the price push | negligible | ~0.2 core | ~2 cores (estimate, linear) |
 | Fan-out to the last stream | ~20 ms | ~100 ms | ~1 s with 2 workers, less with more (estimate) |
 | Writes | ~40/s | ~420/s | ~4,200/s, still one batched transaction per trade |
-| Resolution burst after 30 s of silence | ~500 guesses | ~5,000 guesses | ~50,000 guesses |
+| Resolution burst after 30 s of silence | ~500 Guesses | ~5,000 Guesses | ~50,000 Guesses |
 
 - **Memory and descriptors** grow linearly and stay modest up to 10,000; at 100,000 one process still fits a large instance, but one crash or deploy then drops 100,000 streams.
 - **CPU for the push** is the price event times the number of streams; the throttle to one event a second keeps it flat however busy Bitstamp is.
@@ -174,9 +174,9 @@ macOS `fsync` does not flush the drive cache, so `synchronous=FULL` looked almos
   Between the old leader's death and takeover the price is Price delayed, which ADR 0007 already covers.
 - **A Guess placed on instance B.**
   B holds the request; the 60-second rule needs the Start price and the placement time from the leader's clock (ADR 0002).
-  Two ways keep that: B forwards the command to the leader through a request channel and answers when the leader confirms, or B saves it with the leader's latest price and sequence number and the leader stamps the placement time when it takes the guess into its index.
+  Two ways keep that: B forwards the command to the leader through a request channel and answers when the leader confirms, or B saves it with the leader's latest price and sequence number and the leader stamps the placement time when it takes the Guess into its index.
   Stamping on B's own clock is simpler, but it compares two clocks at the boundary, which ADR 0002 rejected.
-  The leader learns of new guesses through the same pub/sub, and a periodic query of open guesses by due time catches any it missed, since pub/sub such as `NOTIFY` and Redis is at most once.
+  The leader learns of new Guesses through the same pub/sub, and a periodic query of Open guesses by due time catches any it missed, since pub/sub such as `NOTIFY` and Redis is at most once.
 - **Player events to the tab on another instance.**
   The leader saves resolutions, then publishes them; every instance subscribes and delivers to the tabs it holds from its registry by Player ID.
   At two instances, broadcast every Player event to every instance; past a handful, use a channel per Player or per partition.
@@ -195,7 +195,7 @@ macOS `fsync` does not flush the drive cache, so `synchronous=FULL` looked almos
   The ALB client keepalive (default 1 hour) and Render's 100-minute response cap, if it applies to streams, end a stream at most hourly; the client reconnects as on any close.
 - **One clock.**
   Only the leader's clock decides the 60 seconds.
-  After a failover the new leader's clock takes over; NTP keeps the jump small, and a guess that falls due during the gap resolves on the first changed price after takeover, as after a restart.
+  After a failover the new leader's clock takes over; NTP keeps the jump small, and a Guess that falls due during the gap resolves on the first changed price after takeover, as after a restart.
 
 ### Platform fit for more than one instance
 
@@ -229,7 +229,7 @@ The trigger is the first time a deploy or a maintenance window during play is no
 
 1. Add a Postgres adapter behind the store port and move to Render Postgres; drop the disk.
 2. Take leadership through a Postgres session advisory lock; only the leader opens the Bitstamp feed and runs resolution.
-3. Use `LISTEN/NOTIFY` on the same database for prices, Player events and new guesses, so no new service is needed; add a periodic due-guess query as the safety net.
+3. Use `LISTEN/NOTIFY` on the same database for prices, Player events and new Guesses, so no new service is needed; add a periodic due-guess query as the safety net.
 4. Scale the service to two instances manually and raise `maxShutdownDelaySeconds` so each instance can spread its stream closes over the drain window.
 5. Keep the snapshot-first stream as is; add an SSE `retry` field with jitter.
 

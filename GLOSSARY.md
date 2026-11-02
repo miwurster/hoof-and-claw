@@ -19,32 +19,32 @@ The third-party feed the server receives BTC/USD prices from; the server is the 
 _Avoid_: Oracle, ticker, provider
 
 **Price delayed**:
-The state in which the server has no live connection to the Price source; the last price stays visible, and no guess can be placed.
+The state in which the server has no live connection to the Price source; the last price stays visible, and no Guess can be placed.
 _Avoid_: Offline, stale, outage
 
 **Direction**:
-The side a guess takes: Up or Down.
+The side a Guess takes: Up or Down.
 _Avoid_: Bull/bear, long/short, hoof/claw (those are visual motifs, not terms)
 
 **Open guess**:
-A guess that is not yet resolved; a player has at most one.
+A Guess that is not yet resolved; a player has at most one.
 It stays open past 60 seconds for as long as the price has not changed.
 _Avoid_: Pending, overtime, active bet
 
 **Resolved guess**:
-A guess for which at least 60 seconds have passed and the price has changed since it was placed.
+A Guess for which at least 60 seconds have passed and the price has changed since it was placed.
 _Avoid_: Settled, closed, finished
 
 **Start price**:
-The last BTC/USD price the server received before it accepted a guess.
+The last BTC/USD price the server received before it accepted a Guess.
 _Avoid_: Entry price, guess price, opening price
 
 **End price**:
-The BTC/USD price a guess is resolved against: the first price the server receives from the Start price's Price source, at least 60 seconds after the guess was placed, that differs from the Start price by at least one tick.
+The BTC/USD price a Guess is resolved against: the first price the server receives from the Start price's Price source, at least 60 seconds after the Guess was placed, that differs from the Start price by at least one tick.
 _Avoid_: Exit price, resolution price, closing price
 
 **Outcome**:
-The result of a resolved guess: Correct if the price moved in the guessed direction, Wrong otherwise.
+The result of a Resolved guess: Correct if the price moved in the guessed direction, Wrong otherwise.
 _Avoid_: Win/loss, hit/miss
 
 ### Scoring

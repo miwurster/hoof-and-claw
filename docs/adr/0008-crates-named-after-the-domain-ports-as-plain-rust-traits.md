@@ -14,7 +14,7 @@ The acceptance test suite is not a crate but the TypeScript package `acceptance/
 | Crate | Kind | Holds | May depend on |
 | --- | --- | --- | --- |
 | `prices` | core, sync | Price, Price source, the latest price, Price delayed, the `PriceSource` port | `thiserror`, pure crates |
-| `guessing` | core, sync | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due guesses, its store port | `prices`, `thiserror`, pure crates |
+| `guessing` | core, sync | Player, Guess, Direction, Start price, End price, Outcome, Score, resolution over the index of due Guesses, its store port | `prices`, `thiserror`, pure crates |
 | `identity` | core, sync | issuing and checking the anonymous token, token to Player ID, its store port | `guessing`, `thiserror`, pure crates |
 | `game` | shell, async | the running game: takes prices from `PriceSource`, runs the cores, persists before it acknowledges, fans events out to the SSE streams; owns the `Clock` and `Fanout` ports | the cores, `tokio` |
 | `bitstamp` | adapter | `PriceSource` over Bitstamp's WebSocket feed and REST seed (ADR 0007) | `prices`, `tokio`, `tokio-tungstenite`, `rustls` |
@@ -37,7 +37,7 @@ Each has a real adapter and a test adapter, so something varies across every sea
   `game` reads it and passes the time in.
   Adapters: the system clock in `server` and the controllable clock in `test-controls`.
 - **One store port per core.** `guessing`'s port stores Players, Guesses and Scores, and `identity`'s stores token hashes to Player IDs.
-  Each port offers a few operations in domain language, such as placing a guess or resolving one together with its Score change in one call, never generic CRUD.
+  Each port offers a few operations in domain language, such as placing a Guess or resolving one together with its Score change in one call, never generic CRUD.
   Adapters: `sqlite` and a hand-written in-memory fake.
   Both pass one shared test suite per port (ADR 0006).
 - **`Fanout` in `game`.** It publishes prices to every open SSE stream and a Player's events to that Player's streams (ADR 0010).

@@ -28,7 +28,7 @@ A second server that renders pages would show a price that is a second old by th
 - **Routing.** TanStack Router with routes defined in code, and for now the single route `/`.
   The demo uses no file-based routing and no route loaders.
 - **Transport.** Each tab opens one SSE stream that carries prices and the events of its own Player, identified by the cookie.
-  The server pushes a resolution event with the Outcome, End price and new Score the moment it resolves a guess, so the client never polls.
+  The server pushes a resolution event with the Outcome, End price and new Score the moment it resolves a Guess, so the client never polls.
   HTTP is used for reading the Player's current state and for placing a Guess.
   The first event on every stream is a snapshot of the Player's state, so after a reconnect the client rebuilds its state from it (ADR 0010).
 - **Countdown.** The server sends the time remaining on the Open guess as `remainingMs`, together with the server's current time (ADR 0014).

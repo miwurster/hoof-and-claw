@@ -20,9 +20,9 @@ Resolution compares a timer per Open guess, a periodic sweep, and resolving on e
   The flow is one-way (server to browser), SSE reconnects and resumes on its own, and placing a Guess is a plain HTTP POST.
   Polling costs one request per client per interval, which would use up a "one million requests a month" free tier in about 11.6 days of a single open tab polling once per second.
   WebSockets are a valid alternative but add reconnection and replay work that SSE already has.
-- **Resolution.** Resolve on the price tick, and use an index on the due time so each tick touches only the guesses that are due.
-  The glossary's End price is "the first price observed at least 60 seconds after the guess was placed that differs from the Start price", so a guess can only resolve when a price is observed.
-  A timer per guess or a periodic sweep cannot resolve anything without a fresh price, so at best they only trigger fetching one.
+- **Resolution.** Resolve on the price tick, and use an index on the due time so each tick touches only the Guesses that are due.
+  The glossary's End price is "the first price observed at least 60 seconds after the guess was placed that differs from the Start price", so a Guess can only resolve when a price is observed.
+  A timer per Guess or a periodic sweep cannot resolve anything without a fresh price, so at best they only trigger fetching one.
 - **Bottleneck by scale.** Demo scale has none.
   At medium scale it is running more than one server process: who ingests prices and who resolves.
   At large scale it is the burst of resolution writes and per-player notifications on every tick, plus the connection fan-out itself.
@@ -73,19 +73,19 @@ Everything in this section is reasoning from the facts above and from the glossa
 ### The domain decides most of the resolution question
 
 The End price must be observed at least 60 seconds after placement and must differ from the Start price.
-So a guess resolves on a price observation and never on time alone.
+So a Guess resolves on a price observation and never on time alone.
 Two consequences follow:
 
 1. **Resolve on tick is the natural pattern.**
    On each price observation `(price, observedAt)`, resolve every Open guess with `dueAt <= observedAt` and `startPrice != price`.
    Guesses whose Start price equals the new price stay open, as the glossary requires.
 2. **Timers and sweeps only matter for pull-based feeds.**
-   If the server polls the price source, a guess due at 12:00:00 cannot resolve until the next poll after that.
+   If the server polls the price source, a Guess due at 12:00:00 cannot resolve until the next poll after that.
    A timer at `dueAt` that triggers a fresh fetch shortens that wait.
    With a push feed that ticks every second or faster, the timer adds nothing.
 
-All guesses resolved by one tick share the same End price, so a tick resolves a batch in one set-based write.
-Because of this, many guesses due in the same second cost one write at demo and medium scale.
+All Guesses resolved by one tick share the same End price, so a tick resolves a batch in one set-based write.
+Because of this, many Guesses due in the same second cost one write at demo and medium scale.
 
 ### Price delivery compared
 
@@ -101,7 +101,7 @@ Because of this, many guesses due in the same second cost one write at demo and 
 
 The price is one value shared by all players, and newer values replace older ones.
 So a lost price update needs no replay: the next tick corrects it.
-A player's own events (their guess resolved, their Score changed) do matter.
+A player's own events (their Guess resolved, their Score changed) do matter.
 The client should treat the stream as a hint and have the client re-read its state from an HTTP endpoint after every reconnect.
 Then no transport needs exactly-once delivery.
 
@@ -112,9 +112,9 @@ The server still resolves against every price it observes.
 
 | Pattern | How it works | Survives restart | Load shape | Fits End price rule |
 | --- | --- | --- | --- | --- |
-| Timer per guess | In-memory timer, platform alarm, or delayed message at `dueAt` | Only if the timer lives outside the process (alarm, delay queue) | Even, one event per guess | Partly: the timer still needs a fresh price, and must re-arm if the price is unchanged |
-| Periodic sweep | Every k seconds, query guesses with `dueAt <= now` | Yes, if guesses are persisted | Spiky; up to k seconds late | Partly: needs a price observed after `dueAt` |
-| Resolve on tick | Each observed price resolves all due guesses with a different Start price | Yes, if guesses are persisted | One batch per tick | Yes, directly |
+| Timer per Guess | In-memory timer, platform alarm, or delayed message at `dueAt` | Only if the timer lives outside the process (alarm, delay queue) | Even, one event per Guess | Partly: the timer still needs a fresh price, and must re-arm if the price is unchanged |
+| Periodic sweep | Every k seconds, query Guesses with `dueAt <= now` | Yes, if Guesses are persisted | Spiky; up to k seconds late | Partly: needs a price observed after `dueAt` |
+| Resolve on tick | Each observed price resolves all due Guesses with a different Start price | Yes, if Guesses are persisted | One batch per tick | Yes, directly |
 
 Durable Object alarms and SQS deliver at least once, so they can fire twice.
 Resolution must be idempotent: a conditional update such as `... WHERE id = ? AND resolvedAt IS NULL` with the Score change in the same transaction.
@@ -123,12 +123,12 @@ Resolution must be idempotent: a conditional update such as `... WHERE id = ? AN
 
 #### Demo: tens of players
 
-- **Delivery.** SSE from one always-on process; placing a guess is a POST.
+- **Delivery.** SSE from one always-on process; placing a Guess is a POST.
 - **Resolution.** Resolve on tick, in the same process that ingests the price.
-- **Data store access.** One indexed range read and one batch update per tick, for example a partial index on `dueAt` for guesses not yet resolved; the Score update in the same transaction.
+- **Data store access.** One indexed range read and one batch update per tick, for example a partial index on `dueAt` for Guesses not yet resolved; the Score update in the same transaction.
   Keeping Open guesses in memory as well is optional at this size.
 - **Bottleneck.** None; tens of SSE connections and tens of Open guesses are trivial.
-- **Under load or stall.** If the feed stalls, guesses stay open, which is correct by definition, and the UI shows "Price delayed" (already in the [visual direction](../design/visual-direction.md)).
+- **Under load or stall.** If the feed stalls, Guesses stay open, which is correct by definition, and the UI shows "Price delayed" (already in the [visual direction](../design/visual-direction.md)).
   The server needs a staleness check (no price for N seconds) so that a stall is visible and alertable.
 
 #### Medium: thousands of players
@@ -141,7 +141,7 @@ Resolution must be idempotent: a conditional update such as `... WHERE id = ? AN
   Postgres `LISTEN/NOTIFY` or Redis Pub/Sub are enough because the price is latest-value; at-most-once delivery costs at most one stale tick.
 - **Data store access.** The per-tick batch update grows to tens of rows per second on average; `FOR UPDATE SKIP LOCKED` lets several resolvers share a due-guess table without blocking each other.
 - **Bottleneck.** Coordination between instances, not throughput.
-- **Under load or stall.** A resolver that crashes mid-batch leaves guesses open; the next tick picks them up because the query is by `dueAt`, not by "what I scheduled".
+- **Under load or stall.** A resolver that crashes mid-batch leaves Guesses open; the next tick picks them up because the query is by `dueAt`, not by "what I scheduled".
 
 #### Large: a million players
 
@@ -150,11 +150,11 @@ Resolution must be idempotent: a conditional update such as `... WHERE id = ? AN
   Polling at one request per second would be about a million requests per second, so it is ruled out unless an edge cache absorbs it.
 - **Resolution.** Shard Open guesses by player ID.
   Each shard keeps a due-time index (Redis sorted set, a timing wheel in memory backed by a store, or a partitioned table) and resolves on each tick that reaches it.
-  With a 60-second guess and every player always having one Open guess, about 16,700 guesses come due per second, and as many are placed.
-- **Data store access.** Write-heavy; each resolution is a guess update plus a Score update, about 33,000 writes per second at the assumption above, plus the placements.
+  With a 60-second Guess and every player always having one Open guess, about 16,700 Guesses come due per second, and as many are placed.
+- **Data store access.** Write-heavy; each resolution is a Guess update plus a Score update, about 33,000 writes per second at the assumption above, plus the placements.
   Per-player rows avoid hot rows; the cost is the volume, which calls for batching per tick and per shard.
 - **Bottleneck.** The per-tick burst of resolution writes and of per-player outcome notifications, routed to whichever connection server holds that player.
-- **Under load or stall.** A stall followed by recovery means every guess due during the stall resolves on the first tick after it, so the burst is as large as the stall is long.
+- **Under load or stall.** A stall followed by recovery means every Guess due during the stall resolves on the first tick after it, so the burst is as large as the stall is long.
   Resolvers need a bounded batch size and back-pressure, and the UI must tolerate outcomes arriving a few seconds late.
 
 ### Platform features that change the picture
@@ -169,25 +169,25 @@ Resolution must be idempotent: a conditional update such as `... WHERE id = ? AN
 
 ### Failure modes
 
-- **Price feed stalls.** No guess resolves, which the glossary allows ("it stays open past 60 seconds for as long as the price has not changed").
+- **Price feed stalls.** No Guess resolves, which the glossary allows ("it stays open past 60 seconds for as long as the price has not changed").
   Detect it with a heartbeat (Coinbase sends one per second) or a staleness timer, show "Price delayed", and alert.
   A feed that is connected but silent looks the same as a market without trades, so the heartbeat, not the absence of ticks, is the signal.
-- **Server restarts with Open guesses.** Persist each guess with its Start price, placement time and due time before acknowledging it.
-  On start, there is nothing to rebuild beyond loading the due-time index; the first tick after restart resolves all overdue guesses.
+- **Server restarts with Open guesses.** Persist each Guess with its Start price, placement time and due time before acknowledging it.
+  On start, there is nothing to rebuild beyond loading the due-time index; the first tick after restart resolves all overdue Guesses.
   In-memory timers alone would lose every Open guess.
 - **Clock skew between client and server.** The server stamps placement time, due time and every observation with its own clock; the client never sends a time or a price.
   The client draws its countdown from the server's "remaining milliseconds" plus `performance.now()`, not from `Date.now()`, so a wrong client clock cannot misdraw the countdown.
   On the server, the wall clock is needed to persist times across restarts, but it can be stepped by NTP; measuring the 60 seconds against a monotonic clock within one process, and against the wall clock only across restarts, avoids most of that.
-- **Many guesses due in the same second.** Resolve on tick handles them as one set-based update with one End price.
-  At large scale, bound the batch per shard and let the remaining guesses resolve on the next tick, which is still correct because that tick is also "at least 60 seconds after".
-  Strictly, a deferred guess may then get a later End price than one resolved in the same instant; see the open questions.
+- **Many Guesses due in the same second.** Resolve on tick handles them as one set-based update with one End price.
+  At large scale, bound the batch per shard and let the remaining Guesses resolve on the next tick, which is still correct because that tick is also "at least 60 seconds after".
+  Strictly, a deferred Guess may then get a later End price than one resolved in the same instant; see the open questions.
 
 ## Open questions for a decision ticket
 
 1. **Which time counts as "observed"?**
    The exchange's trade timestamp, the time the server received the message, or the time the resolver processed it?
    They differ by network delay and by batching, and the choice decides which price is the End price near the 60-second boundary.
-2. **Outages and deferred batches.** If the server was down or deferred a guess, is the End price the first price the server observes afterwards, or the historical price right after the 60-second mark, fetched from the source's REST history?
+2. **Outages and deferred batches.** If the server was down or deferred a Guess, is the End price the first price the server observes afterwards, or the historical price right after the 60-second mark, fetched from the source's REST history?
    The glossary's "observed" suggests the former, but players may see that as unfair after a long outage.
 3. **What does "differs" mean?**
    At which precision are prices compared (for example cents as the source reports them), and is the comparison on the raw string or on a decimal?

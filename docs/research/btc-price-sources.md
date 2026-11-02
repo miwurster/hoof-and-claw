@@ -5,7 +5,7 @@ All sources were read or probed on 2026-10-31.
 
 ## Question
 
-Which third-party sources can give the server a BTC/USD price fairly and often enough to resolve guesses, for free?
+Which third-party sources can give the server a BTC/USD price fairly and often enough to resolve Guesses, for free?
 For Coinbase, Kraken, Bitstamp, Binance, CoinGecko and CoinCap: rate limits without and with a free key, REST against WebSocket, update frequency, region or cloud IP blocking, and whether the terms allow showing the price in a public app.
 
 ## Answer
@@ -69,7 +69,7 @@ A weekend morning is a quiet period, so these counts are a lower bound, not an a
 - Verified: the same page says Bitstamp "allows the incorporation and redistribution of our exchange data for commercial purposes" and directs companies to sign a commercial use Data License Agreement via partners@bitstamp.net.
 - Verified: `GET https://www.bitstamp.net/api/v2/ticker/btcusd/` worked keyless with `cache-control: max-age=1`.
 - Verified: the `live_trades_btcusd` channel on `wss://ws.bitstamp.net` worked without auth, but delivered only 7 trades in 60 seconds, with a 31.5-second gap between price changes.
-- Inferred: Bitstamp is the source with the clearest written data policy, but its low trade rate makes guesses stay open longer than on Coinbase or Kraken.
+- Inferred: Bitstamp is the source with the clearest written data policy, but its low trade rate makes Guesses stay open longer than on Coinbase or Kraken.
 
 ### Binance
 
@@ -87,7 +87,7 @@ A weekend morning is a quiet period, so these counts are a lower bound, not an a
 - Verified: the [API Terms](https://www.coingecko.com/en/api_terms), version of 2025-09-05, require displaying "Powered by CoinGecko" prominently and say they "do not encourage caching or storage of Data".
 - Verified: `/api/v3/simple/price?ids=bitcoin&vs_currencies=usd` returned `cache-control: max-age=30, s-maxage=60` and a `last_updated_at` about 30 seconds old.
 - Inferred: 10,000 calls a month is one call every 4.5 minutes when spread evenly, far below what a one-minute game needs.
-- Inferred: an aggregated, cached price that moves at most once a minute stretches every guess to two minutes or more under the End price rule.
+- Inferred: an aggregated, cached price that moves at most once a minute stretches every Guess to two minutes or more under the End price rule.
 
 ### CoinCap
 
@@ -98,7 +98,7 @@ A weekend morning is a quiet period, so these counts are a lower bound, not an a
 
 ## Fit for a fair End price
 
-The End price is the first price at least 60 seconds after the guess that differs from the Start price (`GLOSSARY.md`).
+The End price is the first price at least 60 seconds after the Guess that differs from the Start price (`GLOSSARY.md`).
 That rule needs a source that reports individual trades, with a timestamp from the exchange, in real USD.
 
 - Verified: Coinbase (`matches`, ticker `trade_id` and `time`), Kraken (`trade`, ticker `last`) and Bitstamp (`live_trades`) all publish trade-level prices with exchange timestamps.
@@ -114,7 +114,7 @@ That rule needs a source that reports individual trades, with a timestamp from t
 ## Open questions for a later decision
 
 1. Coinbase and Kraken differed by about 5 USD at the same moment, so failing over from one to the other mid-guess can fake a price change.
-   Should a guess stay pinned to the source that gave its Start price, and what happens to an Open guess when that source is down?
+   Should a Guess stay pinned to the source that gave its Start price, and what happens to an Open guess when that source is down?
 2. Coinbase's Market Data Terms of Use returned `403` to automated reads.
    Someone has to read them in a browser before the ADR picks Coinbase, or the ADR picks Kraken or Bitstamp instead.
 3. Nobody has called Coinbase or Kraken from the chosen hosting platform's egress IPs yet; the hosting ADR should include that check.

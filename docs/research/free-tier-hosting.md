@@ -12,7 +12,7 @@ The constraints from #1 that decide the answer:
 
 - Free tiers only, no own AWS account; a tier that bills only past a limit we will not reach is acceptable.
 - No visible cold start for a reviewer.
-- A guess resolves on the server about 60 seconds after placement, once the price has changed, with no browser open.
+- A Guess resolves on the server about 60 seconds after placement, once the price has changed, with no browser open.
 - The demo runs at least six months without maintenance.
 - Infrastructure as code is wanted.
 - Rust is the favourite server language, TypeScript the alternative; the frontend is React.
@@ -34,7 +34,7 @@ Supabase, Neon, Turso and Upstash are useful as data stores or schedulers, but n
 | Cloudflare Workers + Durable Objects | Workers: 100,000 requests/day, 10 ms CPU per request, 5 Cron Triggers. DO: 100,000 requests/day, 13,000 GB-s/day, 5 M rows read/day, 100,000 rows written/day, 5 GB SQLite | Requests fail with Error 1027; DO operations of that type fail with an error until 00:00 UTC; no bill | No _(inference: none mentioned on the pricing pages)_ | Isolates, no VM cold start | DO alarms, at-least-once, retried; Cron Triggers (min 1 minute) | WebSockets on DO with Hibernation API | Yes, `workers-rs` v0.8.7 (2026-09-25) supports DO, SQLite, alarms, WebSocket accept, scheduled events | Terraform `cloudflare/cloudflare` 5.28.1 (2026-10-20); Wrangler | Global edge; DO placed near first caller |
 | Fly.io | None for new organizations since October 2024; trial of 2 machine-hours or 7 days | Card required to continue; smallest always-on machine $2.19 per 30 days | Yes after trial | None if a machine stays running | Any (it is a VM) | Yes | Yes | Terraform provider `fly-apps/fly` last released 2023-06-22 _(stale)_ | Many regions |
 | Deno Deploy | 1 M requests/month, 10 h active CPU, 1 GiB KV, Cron | Not stated for Free | Not stated | Idle apps shut down after about 20 to 30 s | `Deno.cron` | Not stated in sources read | No (JS/TS only) | No current provider (`denoland/deno` 0.1.0 from 2023) | 2 regions |
-| Vercel Hobby + Upstash | Vercel: 1 M function invocations, 4 active CPU-hours, cron once per day (±59 min). Upstash Redis: 500 K commands/month, 250 MB. QStash: 1,000 messages/day, delay up to 7 days | Vercel: feature blocked until 30 days pass. QStash: soft limit, then HTTP 429 | Not for Hobby _(inference)_ | Serverless functions; idle cold starts possible _(inference)_ | Not with Vercel Cron on Hobby; a QStash delayed message per guess could call a function | Functions cap at 300 s, so no long-lived WebSocket _(inference)_ | Rust on Vercel Functions not checked | Terraform `vercel/vercel` 5.24.1 (partner), `upstash/upstash` 2.1.0 (community) | Function region of choice |
+| Vercel Hobby + Upstash | Vercel: 1 M function invocations, 4 active CPU-hours, cron once per day (±59 min). Upstash Redis: 500 K commands/month, 250 MB. QStash: 1,000 messages/day, delay up to 7 days | Vercel: feature blocked until 30 days pass. QStash: soft limit, then HTTP 429 | Not for Hobby _(inference)_ | Serverless functions; idle cold starts possible _(inference)_ | Not with Vercel Cron on Hobby; a QStash delayed message per Guess could call a function | Functions cap at 300 s, so no long-lived WebSocket _(inference)_ | Rust on Vercel Functions not checked | Terraform `vercel/vercel` 5.24.1 (partner), `upstash/upstash` 2.1.0 (community) | Function region of choice |
 | Vercel Daemons (beta) | Hobby: 5 active CPU-hours and 420 GB-hours provisioned memory per month across the team | All daemon instances stop until the 1st of the next month | Not for Hobby _(inference)_ | Always running while quota lasts | Any (container) | No inbound traffic | Any (Linux amd64 container) | Same as Vercel | Configurable |
 | Supabase Free | 500 MB Postgres, 500,000 Edge Function invocations, 200 Realtime connections, 2 M Realtime messages, 5 GB egress, 2 projects | Not stated for Free | Not stated | Edge Functions are serverless _(inference)_ | `pg_cron`, every second to once a year, can call an Edge Function over HTTP | Realtime (WebSocket) | No; Edge Functions run TypeScript on Deno _(inference)_ | Terraform `supabase/supabase` 1.11.0 (community) | Region per project |
 | Neon Free (data store only) | 100 CU-hours per project per month, 1 GB storage per project, 100 projects, 5 GB egress | Compute suspended until next period; writes blocked past storage | No | Scale to zero after 5 min, cannot be turned off | None (data store) | n/a | Postgres from any language | Terraform `kislerdm/neon` 0.18.0 (community) | Region per project |
@@ -67,8 +67,8 @@ Verified:
 
 Inferences:
 
-- A design with one alarm per Open guess fits the Free plan at demo scale: placing a guess costs about one Worker request, one DO request and one row written for the alarm, and each re-check while the price has not changed costs one more alarm.
-- A design that polls the price every second on an alarm loop does not fit: 86,400 alarms a day means 86,400 rows written a day for `setAlarm()` alone, close to the 100,000 limit, before any guess is stored.
+- A design with one alarm per Open guess fits the Free plan at demo scale: placing a Guess costs about one Worker request, one DO request and one row written for the alarm, and each re-check while the price has not changed costs one more alarm.
+- A design that polls the price every second on an alarm loop does not fit: 86,400 alarms a day means 86,400 rows written a day for `setAlarm()` alone, close to the 100,000 limit, before any Guess is stored.
 - Clients that poll the server over HTTP every few seconds would exhaust the 100,000 requests a day with a handful of players; WebSockets with hibernation are the way to push prices and outcomes.
 - One Durable Object kept active all day uses 86,400 seconds times 0.128 GB, about 11,000 GB-s, which is below the 13,000 GB-s a day.
   This assumes Cloudflare bills duration at 128 MB per object, a figure the pages read did not confirm.
@@ -109,7 +109,7 @@ Verified:
 
 Inferences:
 
-- Vercel Cron cannot resolve guesses on Hobby; a QStash message delayed by 60 s per guess could call a Vercel function instead, which caps the demo at about 1,000 guesses a day.
+- Vercel Cron cannot resolve Guesses on Hobby; a QStash message delayed by 60 s per Guess could call a Vercel function instead, which caps the demo at about 1,000 Guesses a day.
 - A 2 GiB daemon running all month needs about 1,440 GB-hours, so the 420 GB-hour Hobby quota runs out after about nine days; Vercel Daemons are no always-on option on Hobby.
 - Without long-lived connections, live prices would need polling or short SSE streams, which costs invocations.
 
@@ -124,7 +124,7 @@ Verified:
 
 Inferences:
 
-- `pg_cron` inside Postgres can resolve guesses with no browser open, as SQL or by calling an Edge Function, so Supabase alone can be a whole backend in TypeScript or SQL, but not in Rust.
+- `pg_cron` inside Postgres can resolve Guesses with no browser open, as SQL or by calling an Edge Function, so Supabase alone can be a whole backend in TypeScript or SQL, but not in Rust.
 - What counts as "inactivity" is not defined on the pages read; a demo nobody visits for a week may pause even with a cron job running, which breaks the six-month unattended run unless confirmed otherwise.
 
 ### Neon and Turso (data stores only)
@@ -182,7 +182,7 @@ Inference: neither runs an always-on server for free.
 
 1. **Cloudflare Workers + Durable Objects (SQLite) + Workers static assets, server in Rust via `workers-rs`.**
    It is the only option that is always on without a VM, has no cold start, has per-object alarms that fire with no client, holds WebSockets with hibernation, fails closed instead of billing, and has a current Terraform provider.
-   The cost is a design that must stay within 100,000 requests and 100,000 rows written a day: one alarm per guess, no per-second price polling loop on the server, and WebSockets instead of HTTP polling.
+   The cost is a design that must stay within 100,000 requests and 100,000 rows written a day: one alarm per Guess, no per-second price polling loop on the server, and WebSockets instead of HTTP polling.
    It also ties Rust to `workers-rs` (no Tokio, some unimplemented APIs) or pushes the server to TypeScript, where the Workers platform is first-class.
 2. **Oracle Cloud Always Free A1 VM + SQLite or Postgres on its block volume + Cloudflare static assets, server in Rust with Tokio.**
    It gives the plainest Rust server and the most headroom (2 OCPU, 12 GB, 10 TB egress), with a current Terraform provider.
@@ -200,7 +200,7 @@ Not shortlisted: Fly.io (no free tier), Deno Deploy (shutting down around April 
 
 ## Open questions for later tickets
 
-- Real-time architecture: how the server observes the End price within the Durable Object request and row-write budget (alarm per guess with re-checks, versus a Cron Trigger at 1-minute granularity, versus clients showing live prices fetched straight from the price source while the server fetches only at placement and resolution).
+- Real-time architecture: how the server observes the End price within the Durable Object request and row-write budget (alarm per Guess with re-checks, versus a Cron Trigger at 1-minute granularity, versus clients showing live prices fetched straight from the price source while the server fetches only at placement and resolution).
 - Price source: whether the chosen BTC/USD API accepts requests from Cloudflare Worker egress IPs and stays within its own free rate limits.
 - Abuse protection: on Cloudflare a flood fails the game closed until 00:00 UTC; rate limiting must protect the daily budget.
 - Oracle: whether a Pay As You Go upgrade, kept within Always Free, exempts instances from idle reclamation, if the VM path is chosen.

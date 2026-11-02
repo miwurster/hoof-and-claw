@@ -11,13 +11,13 @@ Why does a SQL store (SQLite now, Postgres next) fit the game, and when, if ever
 What the store does today (ADR 0003, ADR 0008, ADR 0010):
 
 - **Load a Player**, by ID: Score and Open guess.
-- **Place a guess**, only if the Player has no Open guess.
-- **Resolve a guess** idempotently, only if it is still open, together with the Score change, in one transaction.
+- **Place a Guess**, only if the Player has no Open guess.
+- **Resolve a Guess** idempotently, only if it is still open, together with the Score change, in one transaction.
 - **Save all resolutions of one trade** in one transaction, then publish them.
 - **Rebuild the in-memory index of Open guesses by due time** at start-up.
 
-There is no prices table; each guess stores its Start price and End price with receipt time and trade id.
-The load model from ADR 0003 is about one guess a minute per concurrent Player and about 2.5 writes per guess:
+There is no prices table; each Guess stores its Start price and End price with receipt time and trade id.
+The load model from ADR 0003 is about one Guess a minute per concurrent Player and about 2.5 writes per Guess:
 
 | Concurrent Players | Guesses a second | Writes a second |
 | --- | --- | --- |
@@ -36,8 +36,8 @@ For this game, a NoSQL store does not pay off at any scale in ADR 0003's table, 
   SQL does all of these with an index or a query.
   DynamoDB and Firestore need a global index per pattern, and the two global patterns here (all Open guesses by due time, all Players by Score) concentrate writes on a few keys, which is where their per-partition limits apply.
 - **Throughput is not the reason to leave SQL.**
-  On this laptop, SQLite placed about 256 guesses a second with each commit flushed to the drive (`fullfsync`), and resolved 19,000 to 87,000 guesses a second in batches of 100 to 1,000; a local Postgres 17 ran about 28,000 full guess lifecycles a second (place, resolve, Score) with 64 clients.
-  These are not cloud numbers, but they show that at 100,000 Players (about 1,700 guesses and 4,200 row writes a second) the limit is how commits are flushed, not the engine.
+  On this laptop, SQLite placed about 256 Guesses a second with each commit flushed to the drive (`fullfsync`), and resolved 19,000 to 87,000 Guesses a second in batches of 100 to 1,000; a local Postgres 17 ran about 28,000 full Guess lifecycles a second (place, resolve, Score) with 64 clients.
+  These are not cloud numbers, but they show that at 100,000 Players (about 1,700 Guesses and 4,200 row writes a second) the limit is how commits are flushed, not the engine.
   SQLite's real limit is that WAL works only on one host, so it ends where ADR 0003 already ends it: when the game needs a second instance or redundancy, around 10,000 Players.
 - **Cost rises fastest on the per-request stores.** DynamoDB on demand costs about 680 USD a month at 10,000 Players and about 6,800 USD at 100,000; Firestore about 980 and 9,800 USD.
   A Render Postgres instance with 2 CPU and 16 GB costs 160 USD a month plus storage.
@@ -109,18 +109,18 @@ The single-table design that fits _(inference)_:
 | Operation | DynamoDB | Write units |
 | --- | --- | --- |
 | Load a Player | `GetItem` on `PK = PLAYER#<id>`, strongly consistent; the item holds the Score and the Open guess as a map | 1 read unit |
-| Place a guess | `UpdateItem` on the Player: `SET openGuess = :g` with condition `attribute_not_exists(openGuess)` | 1 |
-| Resolve a guess with its Score | `UpdateItem` on the Player: `SET score = score + :d REMOVE openGuess` with condition `openGuess.id = :g` | 1 |
+| Place a Guess | `UpdateItem` on the Player: `SET openGuess = :g` with condition `attribute_not_exists(openGuess)` | 1 |
+| Resolve a Guess with its Score | `UpdateItem` on the Player: `SET score = score + :d REMOVE openGuess` with condition `openGuess.id = :g` | 1 |
 | Keep the Resolved guess as history | Add a `Put` of `PK = PLAYER#<id>, SK = GUESS#<id>` and make it a `TransactWriteItems` with the update above | 4 (2 items × 2) |
 | Save all resolutions of a trade | Parallel conditional updates, one per Player; at most 100 per transaction if they must commit together | 1 to 4 each |
 | Rebuild the index | Placing also sets top-level `openDueBucket` and `openDueAt` on the Player item and resolving removes them; `Query` the resulting sparse GSI bucket by bucket, eventually consistent | 1 GSI write on every place and every resolve |
 
 - Keeping the Open guess inside the Player item turns "one Open guess per Player" and "resolve only if still open, with the Score" into single-item conditional writes of 1 write unit each.
 - "One transaction per trade" is a SQL batching choice, not a rule; the rule in ADR 0010 is "publish only after save" and "retry with the same End price", and independent conditional writes keep both.
-  At 100,000 Players one trade after a quiet 30 s resolves about 50,000 guesses (ADR 0010), which is 500 transactions of 100.
+  At 100,000 Players one trade after a quiet 30 s resolves about 50,000 Guesses (ADR 0010), which is 500 transactions of 100.
 - What DynamoDB makes hard: the rebuild query.
   It needs a GSI whose partition key every Open guess shares (or a few dozen sharded buckets of it), because Query needs an equality on the partition key; every place and every resolve then writes that GSI, and a GSI that lacks capacity throttles the base table.
-- GSIs follow the table asynchronously, so a rebuild right after a crash can miss a guess placed a moment before; the server then learns of it only when it loads that Player _(inference)_.
+- GSIs follow the table asynchronously, so a rebuild right after a crash can miss a Guess placed a moment before; the server then learns of it only when it loads that Player _(inference)_.
 
 #### Firestore
 
@@ -137,7 +137,7 @@ Fit _(inference)_:
 
 - Place and resolve map to a transaction that reads the Player document, checks the Open guess and writes it, which works.
   A Player's document changes two or three times a minute, inside the per-document limit.
-- Guesses carry `placed_at` and `due_at`, both monotonically increasing, so a guesses collection with those fields indexed is capped at 500 writes a second, about 30,000 Players, unless the indexes are exempted or sharded.
+- Guesses carry `placed_at` and `due_at`, both monotonically increasing, so a Guesses collection with those fields indexed is capped at 500 writes a second, about 30,000 Players, unless the indexes are exempted or sharded.
   The rebuild query needs exactly such an index.
 - Firestore is built for mobile and web clients talking to the database directly; this game has one server that owns all writes, so the client SDKs, offline cache and security rules bring nothing.
 
@@ -157,7 +157,7 @@ Fit _(inference)_:
 
 - **Cassandra and ScyllaDB.** Every core operation is a conditional write, so every one would be a Paxos round trip; the Score cannot be a counter, because counters are not idempotent and resolution must be.
   They pay off for very high write rates with few conditions, which is the opposite of this game.
-- **Redis as the primary store.** A Lua script can check the Open guess and update the Score atomically, but a crash loses up to a second of acknowledged guesses and Outcomes, which breaks ADR 0003's "persist before acknowledging" promise.
+- **Redis as the primary store.** A Lua script can check the Open guess and update the Score atomically, but a crash loses up to a second of acknowledged Guesses and Outcomes, which breaks ADR 0003's "persist before acknowledging" promise.
   As a leaderboard derived from the SQL store, or as ADR 0010's pub/sub channel, it fits well.
 - **MongoDB.** It has everything the game needs (partial unique index, multi-document transactions, sharding by Player ID with the unique index prefixed by it), but for this data model it offers nothing Postgres does not, and Rust has no compile-time query checks for it as sqlx gives for SQL (ADR 0006).
 
@@ -183,8 +183,8 @@ Measured on an Apple M5 laptop SSD, Python's `sqlite3` with SQLite 3.50.4, WAL m
 
 - With every commit flushed to media, the rate of single-guess transactions is the rate of flushes: about 256 a second here.
   macOS's plain `fsync` does not flush the drive's cache, which is why the "No" rows are so much faster; Linux's `fsync` on a cloud volume behaves like the "Yes" rows, at a rate set by the volume's flush latency _(inference)_.
-- So with today's defaults (sqlx's `FULL`, one transaction per placed guess), the store's ceiling for placing guesses is roughly one flush per guess: comfortable at 1,000 Players (17 a second), plausible at 10,000 (170 a second), not at 100,000 (1,700 a second) _(inference)_.
-- Two cheap changes lift that ceiling by two orders of magnitude without leaving SQLite: let the single writer group the guesses that arrive within a few milliseconds into one transaction, as resolutions already are, or accept `synchronous=NORMAL`, which keeps the file consistent but can lose the last commits on a power loss _(inference from the measurements)_.
+- So with today's defaults (sqlx's `FULL`, one transaction per placed Guess), the store's ceiling for placing Guesses is roughly one flush per Guess: comfortable at 1,000 Players (17 a second), plausible at 10,000 (170 a second), not at 100,000 (1,700 a second) _(inference)_.
+- Two cheap changes lift that ceiling by two orders of magnitude without leaving SQLite: let the single writer group the Guesses that arrive within a few milliseconds into one transaction, as resolutions already are, or accept `synchronous=NORMAL`, which keeps the file consistent but can lose the last commits on a power loss _(inference from the measurements)_.
 - Rebuilding the index of 10,000 Open guesses from the partial index took 2 to 3 ms _(measured)_.
 
 #### Postgres on one instance
@@ -199,7 +199,7 @@ Verified:
 - Postgres's own rule of thumb for partitioning: worthwhile "only when a table would otherwise be very large", roughly when "the size of the table should exceed the physical memory of the database server" ([partitioning](https://www.postgresql.org/docs/current/ddl-partitioning.html)).
 - Citus is not a fit "when you do not expect your workload to ever grow beyond a single Postgres node" ([what is Citus](https://docs.citusdata.com/en/stable/get_started/what_is_citus.html)).
 
-Measured with Postgres 17 in Docker on the same laptop (10 CPUs to the VM), `pgbench` running the place and resolve statements above as two transactions per guess, against 1,000,000 Players _(measured)_:
+Measured with Postgres 17 in Docker on the same laptop (10 CPUs to the VM), `pgbench` running the place and resolve statements above as two transactions per Guess, against 1,000,000 Players _(measured)_:
 
 | Clients | Guess lifecycles a second | Row writes a second (×3) | Mean latency |
 | --- | --- | --- | --- |
@@ -209,9 +209,9 @@ Measured with Postgres 17 in Docker on the same laptop (10 CPUs to the VM), `pgb
 
 - Docker's VM disk does not flush like a cloud volume, so these are upper bounds, not a forecast _(inference)_.
   The useful result is the shape: with many concurrent clients, Postgres group-commits, so throughput keeps rising when each commit costs a flush.
-- At 100,000 Players (1,700 guesses, 4,200 writes a second) one mid-sized managed instance is enough; read replicas add nothing, because every read is a keyed lookup of one Player, and only reconnect storms after a deploy (ADR 0010) push reads up _(inference)_.
-- At 1,000,000 Players (17,000 guesses, 42,000 writes a second) a single primary is plausible on large hardware with batched commits, but it is where the design needs its own load test, as ADR 0003 already says _(inference)_.
-- The first thing to outgrow one node is not writes a second but storage, if every Resolved guess is kept: at roughly 100 bytes a row, 100,000 Players add about 4.4 billion guesses and several hundred GB a month, so the guess table passes the server's memory within weeks and wants monthly partitions dropped or archived; 1,000,000 Players add about 4 TB a month _(inference)_.
+- At 100,000 Players (1,700 Guesses, 4,200 writes a second) one mid-sized managed instance is enough; read replicas add nothing, because every read is a keyed lookup of one Player, and only reconnect storms after a deploy (ADR 0010) push reads up _(inference)_.
+- At 1,000,000 Players (17,000 Guesses, 42,000 writes a second) a single primary is plausible on large hardware with batched commits, but it is where the design needs its own load test, as ADR 0003 already says _(inference)_.
+- The first thing to outgrow one node is not writes a second but storage, if every Resolved guess is kept: at roughly 100 bytes a row, 100,000 Players add about 4.4 billion Guesses and several hundred GB a month, so the Guess table passes the server's memory within weeks and wants monthly partitions dropped or archived; 1,000,000 Players add about 4 TB a month _(inference)_.
 - Every operation is keyed by Player, so if one node runs out, distributing by Player ID (Citus, or the "resolution partitioned by Player" of ADR 0003 with one Postgres per partition) keeps every transaction on one node _(inference)_.
 
 #### DynamoDB
@@ -235,7 +235,7 @@ Base-table write cost a month (30 days), one unit per write, no GSIs, `us-east-1
 | 100,000 | 4,200 | 6,800 USD | 1,970 USD | 900 USD |
 | 1,000,000 | 42,000 | 68,000 USD | 19,700 USD | 9,000 USD |
 
-- Transactions double these figures for the writes they cover; the Open-guess GSI adds about two units per guess, and a leaderboard GSI two per Score change.
+- Transactions double these figures for the writes they cover; the Open-guess GSI adds about two units per Guess, and a leaderboard GSI two per Score change.
 - Provisioned capacity must also cover the burst after a quiet market (50,000 resolutions on one trade at 100,000 Players, ADR 0010) or the writes throttle and retry, so steady figures are a floor.
 - Per-Player items spread over the whole key space, so the 1,000-unit partition limit never binds the base table; it binds the two global patterns.
   An Open-guess GSI keyed by due-time bucket receives about 3,400 writes a second at 100,000 Players (1,700 adds and 1,700 removes), so each bucket needs at least four shards, and a leaderboard GSI with one partition key needs at least four as well.
@@ -257,7 +257,7 @@ _(inference)_:
 | 100,000 | 4,200 | 9,800 USD |
 | 1,000,000 | 42,000 | 98,000 USD |
 
-- The 500 writes a second cap on monotonically increasing indexed fields is reached at about 30,000 Players on the guesses collection, before cost becomes the issue.
+- The 500 writes a second cap on monotonically increasing indexed fields is reached at about 30,000 Players on the Guesses collection, before cost becomes the issue.
 
 #### Fixed-price SQL for comparison
 
@@ -285,10 +285,10 @@ SQLite stays right while one process is enough; Postgres is the next step behind
 
 Thresholds, concretely:
 
-- **Up to about 10,000 Players: SQLite.** The single writer is not the limit if placed guesses are grouped into a transaction, as resolutions already are, or if `synchronous=NORMAL` is accepted.
+- **Up to about 10,000 Players: SQLite.** The single writer is not the limit if placed Guesses are grouped into a transaction, as resolutions already are, or if `synchronous=NORMAL` is accepted.
   It ends when the game needs a second instance or no single disk to lose, which ADR 0003 already puts at about 10,000 Players.
 - **About 10,000 to 100,000 Players and beyond: Postgres, one primary.** 4,200 writes a second is a modest load for one instance with group commit.
-  Add high availability for deploys and failures, monthly partitions of the guess table once it outgrows memory, and Redis for a leaderboard if one comes.
+  Add high availability for deploys and failures, monthly partitions of the Guess table once it outgrows memory, and Redis for a leaderboard if one comes.
   Read replicas are for analysis, not for the game.
 - **About 1,000,000 Players: shard by Player.** Citus or Postgres per partition keeps SQL, and DynamoDB with provisioned, reserved capacity becomes a fair alternative at about 9,000 to 20,000 USD a month for the base table, plus sharded GSIs.
   Which wins depends on the measured cost of the Postgres cluster and on whether the leaderboard and rebuild queries move elsewhere, which this research did not settle.
@@ -298,7 +298,7 @@ Access-pattern changes that would favour NoSQL, and how likely they are:
 
 - **The always-on process goes away** (serverless): favours DynamoDB.
   This is the only realistic one.
-- **Multi-region writes with low latency for Players worldwide**: would favour DynamoDB global tables, but ADR 0002 resolves every guess against one Price source and one server clock, so writes in several regions would not help the rules _(inference)_.
+- **Multi-region writes with low latency for Players worldwide**: would favour DynamoDB global tables, but ADR 0002 resolves every Guess against one Price source and one server clock, so writes in several regions would not help the rules _(inference)_.
 - **Writes without conditions** (for example, a log of every price or every client event): favours Cassandra, ScyllaDB or DynamoDB; today the game stores no prices, and every write is conditional.
 
 The planned changes (accounts, leaderboards, analysis) all favour SQL.
@@ -307,7 +307,7 @@ The planned changes (accounts, leaderboards, analysis) all favour SQL.
 
 Both runs used throwaway scripts outside the repository, on 2026-10-31, on an Apple M5 laptop.
 
-- **SQLite:** Python's built-in `sqlite3` (SQLite 3.50.4), WAL mode, schema and statements as in section 1, 200,000 Players, 20,000 placed guesses per run (5,000 for `fullfsync` with `FULL`), half of them resolved in batches of 1, 100 and 1,000.
+- **SQLite:** Python's built-in `sqlite3` (SQLite 3.50.4), WAL mode, schema and statements as in section 1, 200,000 Players, 20,000 placed Guesses per run (5,000 for `fullfsync` with `FULL`), half of them resolved in batches of 1, 100 and 1,000.
   Each placement was its own `BEGIN IMMEDIATE ... COMMIT`.
 - **Postgres:** the `postgres:17` image in Docker with default settings, 1,000,000 Players, `pgbench -T 20` with a script of two transactions: an `INSERT ... ON CONFLICT (player_id) WHERE resolved_at IS NULL DO NOTHING`, then a CTE that resolves the Open guess and adds to the Score.
   No transaction failed.

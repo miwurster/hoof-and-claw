@@ -25,8 +25,8 @@ This settles what ADR 0005, ADR 0006, ADR 0010, ADR 0011 and ADR 0012 left open 
 - Every price is an integer number of cents (ADR 0009), such as `startPrice: 6400012`; it stays well inside a JavaScript `number`'s safe range.
   Only the client formats dollars.
 - `direction` is `"up"` or `"down"`; `outcome` is `"correct"` or `"wrong"`.
-- A guess ID is an opaque string.
-- The time left on an Open guess is `remainingMs`, a whole number of milliseconds that is 0 once the guess is due.
+- A Guess ID is an opaque string.
+- The time left on an Open guess is `remainingMs`, a whole number of milliseconds that is 0 once the Guess is due.
 - `serverTime` is an RFC 3339 timestamp.
 - `price` is `null` while the server has not received a price since it started; `delayed` is then `true`.
 - `build` is the commit the server was built from.
@@ -69,7 +69,7 @@ type GuessResolved = {
 type ServerEvent = Snapshot | PriceChanged | GuessPlaced | GuessResolved;
 ```
 
-- `lastResolved` is the Player's most recent Resolved guess, so a tab that was away when a guess resolved still shows its Outcome, as ADR 0010 requires of the snapshot.
+- `lastResolved` is the Player's most recent Resolved guess, so a tab that was away when a Guess resolved still shows its Outcome, as ADR 0010 requires of the snapshot.
 - A change between live and Price delayed is a `price` event with the new `delayed`, not an event of its own, because every event carries absolute values (ADR 0010).
 - `GET /api/snapshot` returns the `Snapshot` object, `type` included.
 
@@ -85,7 +85,7 @@ type ServerEvent = Snapshot | PriceChanged | GuessPlaced | GuessResolved;
 
 - The request is `POST /api/guesses` with `Content-Type: application/json` and the body `{ "direction": "up" }`.
   A cross-site form cannot send that content type without a CORS preflight, a second guard beside the `SameSite=Lax` cookie (ADR 0001).
-- On success the server answers `201` with the `OpenGuess`, after it has saved the guess and published Guess placed (ADR 0010).
+- On success the server answers `201` with the `OpenGuess`, after it has saved the Guess and published Guess placed (ADR 0010).
   The reducer takes the Open guess by its ID, so the answer and the `guessPlaced` event can arrive in either order.
 
 ### Errors
@@ -103,7 +103,7 @@ Every error from a route under `/api/` or `/test-controls/` is `{ "error": "<cod
 | 500    | `internal`         | anything else, with no detail in the body                                 |
 
 `web` maps the axum extractors' rejections and `tower_governor`'s answer into this format, so no route under `/api/` answers with plain text.
-A refused guess is a `409` and not a `503`, because the server is healthy and a rule of the game refuses the guess.
+A refused Guess is a `409` and not a `503`, because the server is healthy and a rule of the game refuses the Guess.
 
 ### Sharing the types
 
