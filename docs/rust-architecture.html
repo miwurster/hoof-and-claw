@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hoof &amp; Claw: Rust server architecture</title>
+<style>
+  :root {
+    --bg:#121212; --panel:#1c1b19; --panel-2:#24231f; --ink:#ece8df; --muted:#9a958a; --line:#5a564e;
+    --gold:#d9b25f; --green:#a8d08d; --red:#e0684b; --cream:#fbf6ee; --rust:#c4683f; --peach:#f0dccb;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding:28px 40px 4px; }
+  h1 { margin:0 0 4px; font-size:24px; }
+  header p { margin:0; color:var(--muted); max-width:95ch; }
+  nav { position:sticky; top:0; z-index:2; display:flex; gap:8px; padding:12px 40px; background:var(--bg); border-bottom:1px solid #2c2b28; }
+  nav a { padding:6px 12px; border-radius:6px; color:var(--ink); text-decoration:none; background:var(--panel); border:1px solid #33312c; font-size:14px; }
+  nav a:hover { border-color:var(--gold); }
+  section { margin:28px 40px; padding:22px 26px; background:var(--panel); border:1px solid #2c2b28; border-radius:12px; }
+  section h2 { margin:0 0 4px; font-size:19px; }
+  section > p { margin:0 0 16px; color:var(--muted); max-width:95ch; }
+  code { font-family:ui-monospace, "SF Mono", Menlo, monospace; font-size:0.92em; }
+  .figure { overflow-x:auto; }
+  ul.notes { margin:14px 0 0; padding-left:20px; color:var(--muted); font-size:14px; }
+  svg text { font-family:system-ui, -apple-system, "Segoe UI", sans-serif; }
+
+  /* Layers */
+  .layers { background:var(--cream); color:#2a2420; border-radius:6px; padding:22px; font-family:ui-monospace, "SF Mono", Menlo, monospace; max-width:900px; }
+  .layer { border:1.5px solid #2a2420; border-radius:6px; padding:10px 12px; text-align:center; background:#fff; }
+  .layer b { display:block; font-size:18px; font-weight:500; }
+  .layer span { display:block; color:#6b625a; font-size:13.5px; }
+  .layer.binary { background:var(--peach); border-color:var(--rust); }
+  .layer.adapter { border-color:var(--rust); }
+  .layer.testonly { border-style:dashed; }
+  .row { display:grid; gap:12px; }
+  .row.four { grid-template-columns:repeat(4, 1fr); }
+  .row.three { grid-template-columns:repeat(3, 1fr); }
+  .caption { margin:6px 0 16px; font-size:14px; color:#2a2420; }
+  .caption.rust { color:var(--rust); }
+  .depends { margin:0 0 16px; font-size:13px; color:#6b625a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hoof &amp; Claw: Rust server architecture</h1>
+  <p>Three views of the Cargo workspace in <code>crates/</code>: the SSE stream over time, the crates as layers, and the crates as rings around the game rules.
+  Sources: <code>ARCHITECTURE.md</code>, ADRs 0002, 0007, 0008 and 0010, <code>crates/web/src/stream.rs</code>, <code>crates/game/src/game.rs</code>, <code>crates/game/src/fanout.rs</code>.</p>
+</header>
+<nav>
+  <a href="#stream">1 · The SSE stream</a>
+  <a href="#layers">2 · Crates as layers</a>
+  <a href="#rings">3 · Crates as rings</a>
+</nav>
+
+<!-- 1. Sequence of one SSE stream -->
+<section id="stream">
+  <h2>1 · One tab's SSE stream</h2>
+  <p>The tab opens <code>GET /api/events</code>.
+  <code>web</code> subscribes to the <code>Fanout</code> before it builds the snapshot, so an event published in between arrives as an event and is never lost (ADR 0010).
+  After the snapshot, the stream carries prices to every tab and a Player's own events to that Player's tabs.</p>
+  <div class="figure">
+  <svg viewBox="0 0 860 660" width="860" height="660" role="img" aria-label="Sequence diagram of one SSE stream between a tab, web and game">
+    <defs>
+      <marker id="a-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ece8df"/></marker>
+      <marker id="a-gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d9b25f"/></marker>
+      <marker id="a-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#a8d08d"/></marker>
+      <marker id="a-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e0684b"/></marker>
+      <marker id="a-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#9a958a"/></marker>
+    </defs>
+    <rect x="10" y="10" width="840" height="580" rx="12" fill="#24231f"/>
+
+    <!-- lifelines -->
+    <g stroke="#5a564e" stroke-dasharray="3 4">
+      <line x1="150" y1="78" x2="150" y2="570"/>
+      <line x1="430" y1="78" x2="430" y2="570"/>
+      <line x1="710" y1="78" x2="710" y2="570"/>
+    </g>
+    <g text-anchor="middle">
+      <rect x="95" y="34" width="110" height="44" rx="5" fill="#1c1b19" stroke="#d9b25f"/>
+      <text x="150" y="54" fill="#ece8df" font-size="15" font-weight="600">Tab</text>
+      <text x="150" y="70" fill="#9a958a" font-size="11">EventSource</text>
+      <rect x="375" y="34" width="110" height="44" rx="5" fill="#1c1b19" stroke="#d9b25f"/>
+      <text x="430" y="54" fill="#ece8df" font-size="15" font-weight="600">web</text>
+      <text x="430" y="70" fill="#9a958a" font-size="11">axum, SSE</text>
+      <rect x="655" y="34" width="110" height="44" rx="5" fill="#1c1b19" stroke="#d9b25f"/>
+      <text x="710" y="54" fill="#ece8df" font-size="15" font-weight="600">game</text>
+      <text x="710" y="70" fill="#9a958a" font-size="11">Fanout</text>
+    </g>
+
+    <g text-anchor="middle" font-size="13">
+      <!-- request -->
+      <text x="290" y="118" fill="#d9b25f" font-weight="600">GET /api/events</text>
+      <text x="290" y="133" fill="#9a958a" font-size="11">identity cookie, one place per IP</text>
+      <line x1="150" y1="142" x2="428" y2="142" stroke="#d9b25f" stroke-width="1.6" marker-end="url(#a-gold)"/>
+
+      <text x="570" y="178" fill="#d9b25f" font-weight="600">open_stream(token)</text>
+      <text x="570" y="193" fill="#9a958a" font-size="11">subscribe first</text>
+      <line x1="430" y1="202" x2="708" y2="202" stroke="#d9b25f" stroke-width="1.6" marker-end="url(#a-gold)"/>
+
+      <text x="570" y="228" fill="#ece8df" font-weight="600">Player or None, Subscription</text>
+      <line x1="710" y1="238" x2="432" y2="238" stroke="#ece8df" stroke-dasharray="5 4" marker-end="url(#a-ink)"/>
+
+      <text x="290" y="268" fill="#ece8df" font-weight="600">snapshot</text>
+      <text x="290" y="283" fill="#9a958a" font-size="11">full state: price, delayed, Score, Open guess, last Outcome</text>
+      <line x1="430" y1="292" x2="152" y2="292" stroke="#ece8df" stroke-dasharray="5 4" marker-end="url(#a-ink)"/>
+
+      <!-- loop -->
+      <rect x="30" y="314" width="800" height="262" rx="5" fill="none" stroke="#5a564e"/>
+      <rect x="30" y="314" width="44" height="18" rx="3" fill="#5a564e"/>
+      <text x="52" y="327" fill="#ece8df" font-size="11" font-weight="600">loop</text>
+
+      <text x="430" y="352" fill="#a8d08d" font-weight="600">price</text>
+      <text x="430" y="367" fill="#9a958a" font-size="11">≤ 1/s server-wide, only on change · live ↔ Price delayed unthrottled · a slow tab skips to the newest</text>
+      <line x1="708" y1="376" x2="152" y2="376" stroke="#a8d08d" stroke-dasharray="5 4" marker-end="url(#a-green)"/>
+
+      <text x="430" y="412" fill="#e0684b" font-weight="600">guessPlaced</text>
+      <text x="430" y="427" fill="#9a958a" font-size="11">from any tab of this Player, after the Guess is saved</text>
+      <line x1="708" y1="436" x2="152" y2="436" stroke="#e0684b" stroke-dasharray="5 4" marker-end="url(#a-red)"/>
+
+      <text x="430" y="472" fill="#e0684b" font-weight="600">guessResolved</text>
+      <text x="430" y="487" fill="#9a958a" font-size="11">after the save committed, with the Score after it</text>
+      <line x1="708" y1="496" x2="152" y2="496" stroke="#e0684b" stroke-dasharray="5 4" marker-end="url(#a-red)"/>
+
+      <text x="290" y="532" fill="#ece8df" font-weight="600">keepalive</text>
+      <text x="290" y="547" fill="#9a958a" font-size="11">every 15 s, a named event with data {}</text>
+      <line x1="428" y1="556" x2="152" y2="556" stroke="#9a958a" stroke-dasharray="5 4" marker-end="url(#a-muted)"/>
+    </g>
+
+    <!-- legend -->
+    <g font-size="12" fill="#9a958a">
+      <line x1="20" y1="620" x2="48" y2="620" stroke="#ece8df" stroke-width="1.6"/>
+      <text x="56" y="624">request</text>
+      <line x1="130" y1="620" x2="158" y2="620" stroke="#ece8df" stroke-dasharray="5 4"/>
+      <text x="166" y="624">answer or event pushed to the tab</text>
+      <rect x="390" y="614" width="11" height="11" fill="#a8d08d"/>
+      <text x="408" y="624" fill="#a8d08d">every tab</text>
+      <rect x="490" y="614" width="11" height="11" fill="#e0684b"/>
+      <text x="508" y="624" fill="#e0684b">this Player's tabs</text>
+    </g>
+  </svg>
+  </div>
+  <ul class="notes">
+    <li>A visitor without a Guess subscribes as the Player ID their first Guess will create, so the stream gets that Player's events from the first Guess on.</li>
+    <li>Prices go through a slot that holds only the newest price; Player events go through a bounded queue of 16, and a stream whose queue is full is closed instead of skipping one.</li>
+    <li>When the tab disconnects, the stream ends and frees its place in the per-IP stream limit.</li>
+  </ul>
+</section>
+
+<!-- 2. Layers -->
+<section id="layers">
+  <h2>2 · Crates as layers</h2>
+  <p>Each layer may depend only on the layers below it, enforced by <code>crate_graph_follows_the_table</code> in <code>crates/server/tests/architecture.rs</code>.
+  Only the crates named here may use <code>tokio</code>, <code>sqlx</code>, <code>axum</code>, <code>tower-http</code> or <code>tokio-tungstenite</code>, enforced by cargo-deny in <code>deny.toml</code>.</p>
+  <div class="layers">
+    <div class="layer binary"><b>server</b><span>the binary: reads configuration, builds every adapter, hands them to the game, starts tokio, shuts down</span></div>
+    <div class="depends">↓ depends on every crate below</div>
+    <div class="row four">
+      <div class="layer adapter"><b>web</b><span>axum: API, SSE, SPA files</span></div>
+      <div class="layer adapter testonly"><b>test-controls</b><span>test builds only</span></div>
+      <div class="layer adapter"><b>bitstamp</b><span>price feed: WebSocket</span></div>
+      <div class="layer adapter"><b>sqlite</b><span>store: sqlx</span></div>
+    </div>
+    <div class="caption rust">ADAPTERS: implement the ports with real technology</div>
+    <div class="layer"><b>game</b><span>runs prices, guessing, identity; owns Clock and Fanout; only infrastructure: tokio</span></div>
+    <div class="caption">SHELL: the one asynchronous crate, persists before it acknowledges</div>
+    <div class="row three">
+      <div class="layer"><b>identity</b><span>token → Player ID</span></div>
+      <div class="layer"><b>guessing</b><span>Guess, Outcome, Score</span></div>
+      <div class="layer"><b>prices</b><span>Price, Price delayed</span></div>
+    </div>
+    <div class="caption">CORE: the game rules and their ports, synchronous, no I/O, no clock, no infrastructure at all</div>
+  </div>
+  <ul class="notes">
+    <li>Within the core, <code>identity</code> depends on <code>guessing</code>, and <code>guessing</code> on <code>prices</code>.</li>
+    <li><code>bitstamp</code> depends only on <code>prices</code>; <code>sqlite</code> on the cores; <code>web</code> and <code>test-controls</code> on <code>game</code> and the cores.</li>
+    <li><code>anyhow</code> appears only in <code>server</code>.</li>
+  </ul>
+</section>
+
+<!-- 3. Rings -->
+<section id="rings">
+  <h2>3 · Crates as rings</h2>
+  <p>The same crates seen from the inside out: the pure rules in the middle, <code>game</code> around them, and the adapters outside, each plugging into a port an inner ring owns.
+  Every arrow points inwards.</p>
+  <div class="figure">
+  <svg viewBox="0 0 780 580" width="780" height="580" role="img" aria-label="Rings diagram: cores inside game, adapters outside, all inside server">
+    <defs>
+      <marker id="r-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#b8b2a6"/></marker>
+      <radialGradient id="r-glow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#2e2c27"/><stop offset="100%" stop-color="#1f1e1b"/></radialGradient>
+    </defs>
+    <rect x="10" y="10" width="760" height="560" rx="8" fill="#1c1b19" stroke="#4a6fa5" stroke-width="1.2"/>
+    <text x="28" y="36" fill="#ece8df" font-size="15" font-weight="600">server</text>
+    <text x="28" y="55" fill="#9a958a" font-size="12">wires everything in main, provides the system Clock</text>
+
+    <!-- game ring -->
+    <circle cx="390" cy="290" r="195" fill="url(#r-glow)" stroke="#d9b25f" stroke-width="2"/>
+    <text x="390" y="135" text-anchor="middle" fill="#ece8df" font-size="19" font-weight="600">game</text>
+    <text x="390" y="156" text-anchor="middle" fill="#9a958a" font-size="12.5">runs the cores · ports: Clock, Fanout</text>
+
+    <!-- cores ring -->
+    <circle cx="390" cy="300" r="108" fill="#24231f" stroke="#9a958a" stroke-dasharray="4 4"/>
+    <text x="390" y="285" text-anchor="middle" fill="#ece8df" font-size="18" font-weight="600">cores</text>
+    <text x="390" y="309" text-anchor="middle" fill="#ece8df" font-size="14">prices · guessing · identity</text>
+    <text x="390" y="331" text-anchor="middle" fill="#9a958a" font-size="11.5">pure rules · ports: PriceSource, store</text>
+
+    <!-- web -->
+    <rect x="30" y="262" width="136" height="58" rx="8" fill="#24231f" stroke="#b8b2a6"/>
+    <text x="98" y="287" text-anchor="middle" fill="#ece8df" font-size="16" font-weight="600">web</text>
+    <text x="98" y="307" text-anchor="middle" fill="#9a958a" font-size="11.5">calls the game</text>
+    <line x1="166" y1="291" x2="192" y2="291" stroke="#b8b2a6" stroke-width="1.5" marker-end="url(#r-arrow)"/>
+
+    <!-- bitstamp -->
+    <rect x="610" y="118" width="140" height="58" rx="8" fill="#24231f" stroke="#a8d08d"/>
+    <text x="680" y="143" text-anchor="middle" fill="#ece8df" font-size="16" font-weight="600">bitstamp</text>
+    <text x="680" y="163" text-anchor="middle" fill="#9a958a" font-size="11.5">prices in · PriceSource</text>
+    <line x1="610" y1="160" x2="474" y2="234" stroke="#b8b2a6" stroke-width="1.5" marker-end="url(#r-arrow)"/>
+
+    <!-- sqlite -->
+    <rect x="610" y="402" width="140" height="58" rx="8" fill="#24231f" stroke="#e0684b"/>
+    <text x="680" y="427" text-anchor="middle" fill="#ece8df" font-size="16" font-weight="600">sqlite</text>
+    <text x="680" y="447" text-anchor="middle" fill="#9a958a" font-size="11.5">storage · store ports</text>
+    <line x1="610" y1="420" x2="474" y2="366" stroke="#b8b2a6" stroke-width="1.5" marker-end="url(#r-arrow)"/>
+
+    <!-- test-controls -->
+    <rect x="318" y="500" width="144" height="54" rx="8" fill="#1c1b19" stroke="#9a958a" stroke-dasharray="5 4"/>
+    <text x="390" y="523" text-anchor="middle" fill="#ece8df" font-size="15" font-weight="600">test-controls</text>
+    <text x="390" y="542" text-anchor="middle" fill="#9a958a" font-size="11.5">fakes for tests</text>
+    <line x1="390" y1="500" x2="390" y2="488" stroke="#b8b2a6" stroke-width="1.5" marker-end="url(#r-arrow)"/>
+  </svg>
+  </div>
+  <ul class="notes">
+    <li>A port is a plain trait named after the capability, and exists only where two implementations exist (ADR 0008).</li>
+    <li><code>game</code> takes its adapters as generic parameters, never as <code>dyn</code>; there is no dependency injection container.</li>
+    <li><code>test-controls</code> is compiled in only with the Cargo feature <code>test-controls</code>; the release build must not contain it.</li>
+  </ul>
+</section>
+</body>
+</html>
