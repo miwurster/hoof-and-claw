@@ -1,54 +1,139 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>Hoof &amp; Claw: C4 model</title>
-<style>
-  :root { --ink:#1d2330; --muted:#5b6475; --line:#d9dde5; --bg:#f6f7f9; }
-  * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
-  header { padding:24px 40px 8px; }
-  h1 { margin:0 0 4px; font-size:24px; }
-  header p { margin:0; color:var(--muted); }
-  nav { position:sticky; top:0; z-index:2; display:flex; gap:8px; padding:12px 40px; background:var(--bg); border-bottom:1px solid var(--line); }
-  nav a { padding:6px 12px; border-radius:6px; color:var(--ink); text-decoration:none; background:#fff; border:1px solid var(--line); font-size:14px; }
-  nav a:hover { background:#e9edf5; }
-  section { margin:24px 40px; padding:20px 24px; background:#fff; border:1px solid var(--line); border-radius:10px; }
-  section h2 { margin:0 0 4px; font-size:19px; }
-  section > p { margin:0 0 12px; color:var(--muted); max-width:90ch; }
-  .diagram { overflow-x:auto; text-align:center; }
-  .legend { display:flex; flex-wrap:wrap; gap:14px; margin:8px 40px 0; font-size:13px; color:var(--muted); }
-  .legend span::before { content:""; display:inline-block; width:12px; height:12px; margin-right:6px; vertical-align:-1px; border-radius:2px; background:var(--c); }
-  ul.notes { margin:12px 0 0; padding-left:20px; color:var(--muted); font-size:14px; }
-</style>
-</head>
-<body>
-<header>
-  <h1>Hoof &amp; Claw: C4 model</h1>
-  <p>Guess whether BTC/USD is higher or lower one minute from now.
-  Sources: <code>ARCHITECTURE.md</code>, <code>GLOSSARY.md</code>, <code>docs/adr/</code>, <code>infra/main.tf</code>.</p>
-</header>
-<div class="legend">
-  <span style="--c:#08427b">Person</span>
-  <span style="--c:#1168bd">Software system</span>
-  <span style="--c:#438dd5">Container</span>
-  <span style="--c:#85bbf0">Component</span>
-  <span style="--c:#999999">External system</span>
-  <span style="--c:#ffffff; outline:1px dashed #888">Test only</span>
-</div>
-<nav>
-  <a href="#context">1 · System context</a>
-  <a href="#containers">2 · Containers</a>
-  <a href="#server">3 · Components: game server</a>
-  <a href="#spa">3 · Components: SPA</a>
-  <a href="#deployment">Deployment</a>
-</nav>
+  <head>
+    <meta charset="utf-8" />
+    <title>Hoof &amp; Claw: C4 model</title>
+    <style>
+      :root {
+        --ink: #1d2330;
+        --muted: #5b6475;
+        --line: #d9dde5;
+        --bg: #f6f7f9;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font:
+          15px/1.5 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+      }
+      header {
+        padding: 24px 40px 8px;
+      }
+      h1 {
+        margin: 0 0 4px;
+        font-size: 24px;
+      }
+      header p {
+        margin: 0;
+        color: var(--muted);
+      }
+      nav {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        gap: 8px;
+        padding: 12px 40px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+      }
+      nav a {
+        padding: 6px 12px;
+        border-radius: 6px;
+        color: var(--ink);
+        text-decoration: none;
+        background: #fff;
+        border: 1px solid var(--line);
+        font-size: 14px;
+      }
+      nav a:hover {
+        background: #e9edf5;
+      }
+      section {
+        margin: 24px 40px;
+        padding: 20px 24px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      section h2 {
+        margin: 0 0 4px;
+        font-size: 19px;
+      }
+      section > p {
+        margin: 0 0 12px;
+        color: var(--muted);
+        max-width: 90ch;
+      }
+      .diagram {
+        overflow-x: auto;
+        text-align: center;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin: 8px 40px 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .legend span::before {
+        content: "";
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        margin-right: 6px;
+        vertical-align: -1px;
+        border-radius: 2px;
+        background: var(--c);
+      }
+      ul.notes {
+        margin: 12px 0 0;
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Hoof &amp; Claw: C4 model</h1>
+      <p>
+        Guess whether BTC/USD is higher or lower one minute from now. Sources: <code>ARCHITECTURE.md</code>,
+        <code>GLOSSARY.md</code>, <code>docs/adr/</code>, <code>infra/main.tf</code>.
+      </p>
+    </header>
+    <div class="legend">
+      <span style="--c: #08427b">Person</span>
+      <span style="--c: #1168bd">Software system</span>
+      <span style="--c: #438dd5">Container</span>
+      <span style="--c: #85bbf0">Component</span>
+      <span style="--c: #999999">External system</span>
+      <span style="--c: #ffffff; outline: 1px dashed #888">Test only</span>
+    </div>
+    <nav>
+      <a href="#context">1 · System context</a>
+      <a href="#containers">2 · Containers</a>
+      <a href="#server">3 · Components: game server</a>
+      <a href="#spa">3 · Components: SPA</a>
+      <a href="#deployment">Deployment</a>
+    </nav>
 
-<section id="context">
-  <h2>Level 1: System context</h2>
-  <p>A Player plays anonymously in a browser.
-  The game server is the only party that observes prices and time; it takes them from Bitstamp's public BTC/USD trade feed.</p>
-  <div class="diagram"><pre class="mermaid">
+    <section id="context">
+      <h2>Level 1: System context</h2>
+      <p>
+        A Player plays anonymously in a browser. The game server is the only party that observes prices and time; it
+        takes them from Bitstamp's public BTC/USD trade feed.
+      </p>
+      <div class="diagram">
+        <pre class="mermaid">
 flowchart TB
   player["<b>Player</b><br/><i>[Person]</i><br/>Guesses Up or Down, sees the latest price and their Score"]:::person
   hc["<b>Hoof &amp; Claw</b><br/><i>[Software system]</i><br/>Accepts Guesses, resolves them against the first changed price ≥ 60 s later, keeps a durable Score"]:::system
@@ -58,14 +143,18 @@ flowchart TB
   classDef person fill:#08427b,stroke:#052e56,color:#fff
   classDef system fill:#1168bd,stroke:#0b4884,color:#fff
   classDef external fill:#999,stroke:#6b6b6b,color:#fff
-  </pre></div>
-</section>
+  </pre>
+      </div>
+    </section>
 
-<section id="containers">
-  <h2>Level 2: Containers</h2>
-  <p>One Rust process serves the SPA's static files and the API from the same origin and owns the one SQLite file.
-  The API contract is generated from the server's wire types into <code>contract/</code> (ADR 0014).</p>
-  <div class="diagram"><pre class="mermaid">
+    <section id="containers">
+      <h2>Level 2: Containers</h2>
+      <p>
+        One Rust process serves the SPA's static files and the API from the same origin and owns the one SQLite file.
+        The API contract is generated from the server's wire types into <code>contract/</code> (ADR 0014).
+      </p>
+      <div class="diagram">
+        <pre class="mermaid">
 flowchart TB
   player["<b>Player</b><br/><i>[Person]</i>"]:::person
   subgraph hc["Hoof &amp; Claw [Software system]"]
@@ -85,15 +174,19 @@ flowchart TB
   classDef container fill:#438dd5,stroke:#2e6295,color:#fff
   classDef external fill:#999,stroke:#6b6b6b,color:#fff
   style hc fill:none,stroke:#1168bd,stroke-dasharray:6 4,color:#1168bd
-  </pre></div>
-</section>
+  </pre>
+      </div>
+    </section>
 
-<section id="server">
-  <h2>Level 3: Components of the game server (Cargo workspace, <code>crates/</code>)</h2>
-  <p>Crates are cut by area of the domain.
-  The cores are synchronous and pure; <code>game</code> is the one async shell; adapters plug into ports the cores own.
-  Arrows follow the allowed crate dependencies, enforced by <code>crate_graph_follows_the_table</code>.</p>
-  <div class="diagram"><pre class="mermaid">
+    <section id="server">
+      <h2>Level 3: Components of the game server (Cargo workspace, <code>crates/</code>)</h2>
+      <p>
+        Crates are cut by area of the domain. The cores are synchronous and pure; <code>game</code> is the one async
+        shell; adapters plug into ports the cores own. Arrows follow the allowed crate dependencies, enforced by
+        <code>crate_graph_follows_the_table</code>.
+      </p>
+      <div class="diagram">
+        <pre class="mermaid">
 flowchart TB
   spa["<b>SPA</b><br/><i>[Container]</i>"]:::container
   subgraph srv["Game server [Container]"]
@@ -131,19 +224,32 @@ flowchart TB
   classDef testonly fill:#fff,stroke:#888,stroke-dasharray:5 4,color:#333
   style srv fill:none,stroke:#438dd5,stroke-dasharray:6 4,color:#2e6295
   style cores fill:#eef5fc,stroke:#85bbf0,color:#2e6295
-  </pre></div>
-  <ul class="notes">
-    <li>Only the system clock adapter may call <code>SystemTime::now</code> or <code>Instant::now</code> (Clippy <code>disallowed-methods</code>).</li>
-    <li><code>game</code> takes its adapters as generic parameters; there is no <code>dyn</code> and no DI container.</li>
-    <li>The release build contains no <code>test-controls</code>, checked by <code>release_build_has_no_test_controls</code>.</li>
-  </ul>
-</section>
+  </pre>
+      </div>
+      <ul class="notes">
+        <li>
+          Only the system clock adapter may call <code>SystemTime::now</code> or <code>Instant::now</code> (Clippy
+          <code>disallowed-methods</code>).
+        </li>
+        <li>
+          <code>game</code> takes its adapters as generic parameters; there is no <code>dyn</code> and no DI container.
+        </li>
+        <li>
+          The release build contains no <code>test-controls</code>, checked by
+          <code>release_build_has_no_test_controls</code>.
+        </li>
+      </ul>
+    </section>
 
-<section id="spa">
-  <h2>Level 3: Components of the SPA (<code>spa/src/</code>)</h2>
-  <p>One pure reducer takes state plus a server event or user action; one thin hook owns <code>EventSource</code> and <code>fetch</code>.
-  Presentational components receive only props and callbacks (dependency-cruiser rule <code>presentational-components-skip-the-data-layer</code>).</p>
-  <div class="diagram"><pre class="mermaid">
+    <section id="spa">
+      <h2>Level 3: Components of the SPA (<code>spa/src/</code>)</h2>
+      <p>
+        One pure reducer takes state plus a server event or user action; one thin hook owns <code>EventSource</code> and
+        <code>fetch</code>. Presentational components receive only props and callbacks (dependency-cruiser rule
+        <code>presentational-components-skip-the-data-layer</code>).
+      </p>
+      <div class="diagram">
+        <pre class="mermaid">
 flowchart TB
   player["<b>Player</b><br/><i>[Person]</i>"]:::person
   server["<b>Game server</b><br/><i>[Container]</i>"]:::container
@@ -172,14 +278,19 @@ flowchart TB
   classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
   classDef external fill:#ddd,stroke:#999,color:#000
   style spa fill:none,stroke:#438dd5,stroke-dasharray:6 4,color:#2e6295
-  </pre></div>
-</section>
+  </pre>
+      </div>
+    </section>
 
-<section id="deployment">
-  <h2>Deployment: production</h2>
-  <p>One Render web service in Frankfurt with a 1 GB persistent disk, behind Cloudflare, within a budget of 10 EUR a month (ADR 0003).
-  GitHub Actions runs only the Green gate; <code>mise run release</code> fast-forwards <code>release</code>, and Render builds the Dockerfile from it (ADR 0013).</p>
-  <div class="diagram"><pre class="mermaid">
+    <section id="deployment">
+      <h2>Deployment: production</h2>
+      <p>
+        One Render web service in Frankfurt with a 1 GB persistent disk, behind Cloudflare, within a budget of 10 EUR a
+        month (ADR 0003). GitHub Actions runs only the Green gate; <code>mise run release</code> fast-forwards
+        <code>release</code>, and Render builds the Dockerfile from it (ADR 0013).
+      </p>
+      <div class="diagram">
+        <pre class="mermaid">
 flowchart LR
   browser["<b>Player's browser</b><br/><i>[Device]</i><br/>runs the SPA"]:::container
   subgraph cf["Cloudflare [Edge]"]
@@ -218,17 +329,24 @@ flowchart LR
   style disk fill:#fff,stroke:#438dd5,color:#2e6295
   style cf fill:#fff7ef,stroke:#f38020,color:#b35c00
   style gh fill:#f6f8fa,stroke:#57606a,color:#24292f
-  </pre></div>
-  <ul class="notes">
-    <li>Infrastructure is Terraform in <code>infra/main.tf</code>, applied by hand; rollback uses Render's dashboard.</li>
-  </ul>
-</section>
+  </pre>
+      </div>
+      <ul class="notes">
+        <li>
+          Infrastructure is Terraform in <code>infra/main.tf</code>, applied by hand; rollback uses Render's dashboard.
+        </li>
+      </ul>
+    </section>
 
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true, securityLevel: "loose", theme: "base",
-    flowchart: { htmlLabels: true, curve: "basis", padding: 12, wrappingWidth: 260 },
-    themeVariables: { fontFamily: "system-ui, sans-serif", fontSize: "14px", lineColor: "#707a8a" } });
-</script>
-</body>
+    <script type="module">
+      import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+      mermaid.initialize({
+        startOnLoad: true,
+        securityLevel: "loose",
+        theme: "base",
+        flowchart: { htmlLabels: true, curve: "basis", padding: 12, wrappingWidth: 260 },
+        themeVariables: { fontFamily: "system-ui, sans-serif", fontSize: "14px", lineColor: "#707a8a" },
+      });
+    </script>
+  </body>
 </html>
